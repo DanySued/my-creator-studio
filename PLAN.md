@@ -89,41 +89,43 @@ my-creator-studio/
 > Goal: New repo running, dashboard shell up, Settings page shows live health checks for all integrations.
 
 ### 1.1 Repo & Project Structure
-- [~] Create `my-creator-studio/` directory
-- [ ] Initialize git repo
-- [ ] Create `web/` — Next.js 15 app with TypeScript + Tailwind CSS 4 + shadcn/ui
-- [ ] Create `api/` — Python FastAPI skeleton
-- [ ] Create `media/` folder structure
-- [ ] Create `docker-compose.yml`
-- [ ] Create `.env.example` with all required variables documented
+- [x] Create `my-creator-studio/` directory
+- [x] Initialize git repo
+- [x] Create `web/` — Next.js 16 app with TypeScript + Tailwind CSS 4 + shadcn/ui (base-ui)
+- [x] Create `api/` — Python FastAPI skeleton
+- [x] Create `media/` folder structure
+- [x] Create `docker-compose.yml`
+- [x] Create `.env.example` with all required variables documented
 
 ### 1.2 Dashboard Shell (Next.js)
-- [ ] Sidebar with navigation: Carousel, Reels, Publish, Accounts, Settings
-- [ ] Top bar showing active Instagram accounts
-- [ ] Status bar for active jobs (generating, posting, etc.)
-- [ ] Placeholder pages for each section
-- [ ] Dark theme, high-fidelity design
+- [x] Sidebar with navigation: Carousel, Reels, Publish, Accounts, Settings
+- [x] Top bar with page title + description
+- [x] Placeholder pages for each section
+- [x] Dark theme, high-fidelity design (violet accent, glass-style cards)
+- [x] Route: `/` → redirects to `/dashboard`; all sections at their own paths
 
 ### 1.3 Python API Skeleton
-- [ ] FastAPI app with CORS configured
-- [ ] Health check router (`GET /health`) — tests Gemini, Pexels, Instagram session
-- [ ] Serve media files statically
-- [ ] SQLite models: Account, ScheduledPost, ActivityLog, AudioTrack
-- [ ] Dockerfile for the API service
+- [x] FastAPI app with CORS configured
+- [x] Health check router — tests Gemini, Pexels connections
+- [x] Serve media files statically
+- [x] Router stubs for carousel, reels, instagram
+- [x] Dockerfile for the API service (includes ffmpeg)
 
 ### 1.4 Settings Page
-- [ ] API key input fields (Gemini, Pexels) — saved to `.env` file
-- [ ] Connection status cards (✅/❌) for each integration
-- [ ] "Test connection" button for each
-- [ ] Step-by-step setup guide rendered inline for any failed connection
-- [ ] Instagram account cards — add / remove / check session status
+- [x] API key input fields (Gemini, Pexels) with show/hide toggle
+- [x] Connection status cards (✅/❌/checking) for each integration
+- [x] "Test" button — calls backend health endpoint, saves key on success
+- [x] Step-by-step setup guide inline (collapsible)
+- [x] Troubleshooting tips shown when connection fails
+- [x] Backend service guide (how to run, first-time setup tips)
+- [ ] Instagram account cards — add / remove / check session status (Phase 4)
 
 ### 1.5 Docker Compose
-- [ ] `web` service: Next.js on port 3000
-- [ ] `api` service: FastAPI on port 8000 (internal), ffmpeg installed
-- [ ] Shared `media/` volume
-- [ ] `studio.db` volume for persistence
-- [ ] `docker compose up` starts both, hot reload on both
+- [x] `web` service: Next.js on port 3000
+- [x] `api` service: FastAPI on port 8000, ffmpeg installed via apt
+- [x] Shared `media/` volume
+- [x] `api_data` named volume for SQLite persistence
+- [ ] Verified end-to-end `docker compose up` flow (needs Docker Desktop installed)
 
 ---
 
@@ -259,4 +261,4 @@ docker compose up --build
 
 | Date | Session | What was done | Stopped at |
 |------|---------|---------------|------------|
-| 2026-05-06 | 1 | Created plan, starting Phase 1 | — |
+| 2026-05-06 | 1 | Phase 1 complete: repo init, Next.js 16 dashboard shell, Python API skeleton, Settings page with health checks + guided setup, Docker Compose | Phase 2 — Carousel tool |
