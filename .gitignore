@@ -24,8 +24,9 @@ media/music/
 # Database
 api/data/
 
-# Docker
-.dockerignore
+# Claude Code local config
+.claude/settings.local.json
+.claudeignore
 
 # OS
 .DS_Store

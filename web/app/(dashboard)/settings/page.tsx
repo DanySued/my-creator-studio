@@ -124,7 +124,6 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
 
   return (
     <Card className="p-5 bg-card border-border">
-      {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <StatusIcon status={status} />
@@ -146,7 +145,6 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
         </a>
       </div>
 
-      {/* Key input */}
       <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
           <input
@@ -189,7 +187,6 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
         </p>
       )}
 
-      {/* Setup / Troubleshoot guide */}
       <button
         onClick={() => setShowGuide(!showGuide)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -232,8 +229,7 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
 
 export default function SettingsPage() {
   return (
-    <div className="p-6 max-w-2xl space-y-8">
-      {/* API Connections */}
+    <div className="p-6 max-w-2xl mx-auto space-y-8">
       <section>
         <h2 className="text-sm font-semibold text-foreground mb-1">API Connections</h2>
         <p className="text-xs text-muted-foreground mb-4">
@@ -248,7 +244,6 @@ export default function SettingsPage() {
 
       <Separator />
 
-      {/* Backend status */}
       <section>
         <h2 className="text-sm font-semibold text-foreground mb-1">Backend Service</h2>
         <p className="text-xs text-muted-foreground mb-4">

@@ -35,8 +35,7 @@ const TOOLS = [
 
 export default function OverviewPage() {
   return (
-    <div className="p-6 max-w-4xl">
-      {/* Welcome */}
+    <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="w-4 h-4 text-primary" />
@@ -48,7 +47,6 @@ export default function OverviewPage() {
         </p>
       </div>
 
-      {/* Setup banner */}
       <div className="flex items-start gap-3 p-4 mb-8 rounded-xl border border-amber-400/20 bg-amber-400/5">
         <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
         <div>
@@ -63,7 +61,6 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* Tools grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TOOLS.map(({ href, icon: Icon, label, description, status, color, bg }) => (
           <Link key={href} href={href} className="group">
@@ -88,7 +85,6 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      {/* Quick stats placeholder */}
       <div className="mt-8 grid grid-cols-3 gap-4">
         {[
           { label: "Carousels created", value: "—" },

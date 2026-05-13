@@ -3,6 +3,7 @@ services:
     build: ./api
     ports:
       - "8000:8000"
+    env_file: .env
     volumes:
       - ./api:/app
       - ./media:/media
@@ -21,7 +22,7 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      - API_URL=http://api:8000
+      - API_URL=http://api:8000          # server-side only (Docker internal)
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
     depends_on:
       - api

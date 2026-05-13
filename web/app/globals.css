@@ -46,6 +46,9 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --color-violet: var(--violet);
   --color-violet-muted: var(--violet-muted);
+  --color-surface-base: var(--surface-base);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-elevated: var(--surface-elevated);
 }
 
 :root {
@@ -87,6 +90,11 @@
 
   --violet: oklch(0.65 0.22 292);
   --violet-muted: oklch(0.65 0.22 292 / 15%);
+
+  /* Surface elevation scale */
+  --surface-base: oklch(0.12 0.006 260);
+  --surface-panel: oklch(0.14 0.007 260);
+  --surface-elevated: oklch(0.17 0.008 260);
 }
 
 @layer base {
@@ -99,6 +107,11 @@
   html {
     @apply font-sans;
   }
+}
+
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
 @layer utilities {

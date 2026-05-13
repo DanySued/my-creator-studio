@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/reels", icon: Video, label: "Reels" },
   { href: "/publish", icon: Send, label: "Publish" },
   { href: "/accounts", icon: Users, label: "Accounts" },
+  { href: "/automation", icon: Bot, label: "Automation" },
 ];
 
 export default function Sidebar() {
