@@ -5,22 +5,22 @@ import urllib.parse
 from datetime import datetime
 from peewee import Model, CharField, TextField, IntegerField, DateTimeField, ForeignKeyField, BooleanField
 
+# Railway blocks outbound IPv6; monkey-patch getaddrinfo so every DNS lookup in this
+# process (including psycopg2/libpq's internal calls) only returns AF_INET results.
+_orig_getaddrinfo = socket.getaddrinfo
+def _ipv4_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = _ipv4_getaddrinfo
+
 # Use PostgreSQL when DATABASE_URL is set (Railway/Supabase), else fall back to SQLite
 _DATABASE_URL = os.getenv("DATABASE_URL")
 if _DATABASE_URL:
     from peewee import PostgresqlDatabase
     _p = urllib.parse.urlparse(_DATABASE_URL)
-    _port = _p.port or 5432
-    # Railway's network blocks outbound IPv6; force IPv4 by resolving AF_INET explicitly
-    # so psycopg2/libpq doesn't pick an AAAA record that can't be reached.
-    try:
-        _ipv4 = socket.getaddrinfo(_p.hostname, _port, socket.AF_INET, socket.SOCK_STREAM)[0][4][0]
-    except socket.gaierror:
-        _ipv4 = _p.hostname
     db = PostgresqlDatabase(
         _p.path.lstrip("/"),
-        host=_ipv4,
-        port=_port,
+        host=_p.hostname,
+        port=_p.port or 5432,
         user=_p.username,
         password=_p.password,
         sslmode="require",
