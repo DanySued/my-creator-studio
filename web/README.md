@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# My Creator Studio — Web Frontend
 
-## Getting Started
+Next.js 16 frontend for the My Creator Studio platform. All UI runs here; API calls proxy server-side to the Python backend.
 
-First, run the development server:
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev       # http://localhost:3000  (hot-reload)
+npm run lint      # ESLint check
+npm run build     # Production build (same as Railway uses)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Route proxy** — browser never calls the Python API directly. All requests go through Next.js Route Handler catch-alls in `app/api/` which forward to `API_URL` (Docker internal: `http://api:8000`, Railway: private hostname).
+- **`(dashboard)/layout.tsx`** — wraps every page with `<ReelGenerationProvider>` and renders `<GlobalReelStatus>` (floating reel-job pill).
+- **`lib/ReelGenerationContext.tsx`** — global context for reel job state; polls `/api/reels/job/{id}` every 2 s; stops on terminal states.
+- **UI** — Radix UI primitives + shadcn/ui, Tailwind CSS v4.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+| Variable | Value in Docker | Value on Railway |
+|---|---|---|
+| `API_URL` | `http://api:8000` | Railway private hostname |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | `https://web-production-77b4e.up.railway.app` |
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Deployed to Railway. Pushes to `master` trigger an automatic rebuild via the Dockerfile (production standalone build → `node server.js`). No local Docker needed for development — use `npm run dev` instead.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **Note:** This project uses **Next.js 16**, which has breaking changes from earlier versions. Before adding any Next.js-specific code, check `node_modules/next/dist/docs/` for current API conventions.

@@ -1,7 +1,7 @@
 # My Creator Studio — Build Plan
 
 > **Personal content studio** merging three projects (carroussel, viralvibe, instagram-automation-bot) into one unified dashboard.
-> Updated live as we build. Resume any time by reading this file.
+> All four phases are complete and deployed to Railway. This file is kept as a historical record.
 
 ---
 
@@ -17,7 +17,7 @@
 
 ```
 my-creator-studio/
-├── web/                  # Next.js 15 — all three tool UIs + BFF API routes
+├── web/                  # Next.js 16 — all three tool UIs + BFF API routes
 │   ├── app/
 │   │   ├── (dashboard)/
 │   │   │   ├── layout.tsx       # Sidebar + top bar
@@ -66,11 +66,12 @@ my-creator-studio/
 ```
 
 **Key decisions:**
-- Docker Compose orchestrates both services — one command to run
+- Docker Compose orchestrates both services locally — one command to run
 - ffmpeg runs inside Docker — no manual install needed
 - Next.js API routes proxy to Python — no CORS issues in the UI
-- SQLite for all persistence — no database server to manage
-- Media files in a shared local folder — no cloud storage needed
+- SQLite locally (Peewee ORM, `/data/studio.db`) — PostgreSQL on Railway (auto-wired via `DATABASE_URL`)
+- Media files in a shared volume — no cloud storage needed
+- Deployed to Railway; both app services auto-deploy on push to `master`
 
 ---
 
@@ -118,14 +119,14 @@ my-creator-studio/
 - [x] Step-by-step setup guide inline (collapsible)
 - [x] Troubleshooting tips shown when connection fails
 - [x] Backend service guide (how to run, first-time setup tips)
-- [ ] Instagram account cards — add / remove / check session status (Phase 4)
+- [x] Instagram account cards — add / remove / check session status (Phase 4)
 
 ### 1.5 Docker Compose
 - [x] `web` service: Next.js on port 3000
 - [x] `api` service: FastAPI on port 8000, ffmpeg installed via apt
 - [x] Shared `media/` volume
 - [x] `api_data` named volume for SQLite persistence
-- [ ] Verified end-to-end `docker compose up` flow (needs Docker Desktop installed)
+- [x] Verified end-to-end `docker compose up` flow
 
 ---
 
@@ -133,24 +134,24 @@ my-creator-studio/
 > Goal: Full carousel generation working inside the unified UI. Source: `carroussel/` repo.
 
 ### 2.1 Migrate Frontend
-- [ ] Port `UploadZone` component — accepts PDF, DOCX, TXT
-- [ ] Port `ConfigPanel` — slide count, language, theme selector
-- [ ] Port `SlidePreview` + `SlideStrip` — inline editing
-- [ ] Port `ThemeSelector` with all original themes
-- [ ] Port `GalleryPage` — browse generated carousels
-- [ ] Port `SettingsPage` — export quality (pixel ratio)
-- [ ] Port image crop tool (`react-easy-crop`)
+- [x] Port `UploadZone` component — accepts PDF, DOCX, TXT
+- [x] Port `ConfigPanel` — slide count, language, theme selector
+- [x] Port `SlidePreview` + `SlideStrip` — inline editing
+- [x] Port `ThemeSelector` with all original themes
+- [x] Port `GalleryPage` — browse generated carousels
+- [x] Port `SettingsPage` — export quality (pixel ratio)
+- [x] Port image crop tool (`react-easy-crop`)
 
 ### 2.2 Backend (Gemini API)
-- [ ] `POST /carousel/generate` — accepts text, returns slide JSON array (from `carroussel/api/generate.ts`, rewritten in Python)
-- [ ] `POST /carousel/export` — accepts slide data, returns ZIP of PNGs
-- [ ] `GET /carousel/history` — lists past generated carousels from SQLite
+- [x] `POST /carousel/generate` — accepts text, returns slide JSON array (from `carroussel/api/generate.ts`, rewritten in Python)
+- [x] `POST /carousel/export` — accepts slide data, returns ZIP of PNGs
+- [x] `GET /carousel/history` — lists past generated carousels from SQLite
 
 ### 2.3 Wire Up
-- [ ] Next.js API route `/api/carousel/*` proxies to Python
-- [ ] Text extraction (PDF/DOCX) stays client-side (pdfjs-dist + mammoth)
-- [ ] Export ZIP downloads correctly from Python response
-- [ ] Error handling: Gemini quota exceeded, invalid file type, empty content
+- [x] Next.js API route `/api/carousel/*` proxies to Python
+- [x] Text extraction (PDF/DOCX) stays client-side (pdfjs-dist + mammoth)
+- [x] Export ZIP downloads correctly from Python response
+- [x] Error handling: Gemini quota exceeded, invalid file type, empty content
 
 ---
 
@@ -158,27 +159,27 @@ my-creator-studio/
 > Goal: Full reel generation working. Source: `viralvibe/` repo + its separate backend.
 
 ### 3.1 Migrate Frontend
-- [ ] Port `KeywordEngine` — tag-based keyword input
-- [ ] Port `AudioLibrary` — upload and select music tracks
-- [ ] Port `BulkSettings` — reel count, duration, song start time
-- [ ] Port `TextOverlays` — add/edit/position text burned into video
-- [ ] Port `Timeline` — song timeline / clip trim UI
-- [ ] Port `VideoPreview` — preview generated reel
-- [ ] Port `MyReelsPage` — library of all generated reels
+- [x] Port `KeywordEngine` — tag-based keyword input
+- [x] Port `AudioLibrary` — upload and select music tracks
+- [x] Port `BulkSettings` — reel count, duration, song start time
+- [x] Port `TextOverlays` — add/edit/position text burned into video
+- [x] Port `Timeline` — song timeline / clip trim UI
+- [x] Port `VideoPreview` — preview generated reel
+- [x] Port `MyReelsPage` — library of all generated reels
 
 ### 3.2 Backend (Pexels + ffmpeg)
-- [ ] `POST /reels/generate` — accepts keywords + audio + settings, queues job
-- [ ] `GET /reels/job/{id}` — polls job status (queued → processing → done)
-- [ ] `GET /reels/list` — lists all generated reels
-- [ ] `POST /reels/upload-audio` — saves audio track to `media/music/`
-- [ ] `GET /reels/audio` — lists audio library
-- [ ] ffmpeg pipeline: fetch Pexels clips → trim → concat → mix audio → burn text → 1080×1920 MP4
+- [x] `POST /reels/generate` — accepts keywords + audio + settings, queues job
+- [x] `GET /reels/job/{id}` — polls job status (queued → processing → done)
+- [x] `GET /reels/list` — lists all generated reels
+- [x] `POST /reels/upload-audio` — saves audio track to `media/music/`
+- [x] `GET /reels/audio` — lists audio library
+- [x] ffmpeg pipeline: fetch Pexels clips → trim → concat → mix audio → burn text → 1080×1920 MP4
 
 ### 3.3 Wire Up
-- [ ] Job polling via Server-Sent Events (SSE) or 2s interval
-- [ ] Progress bar during generation
-- [ ] Download generated reel
-- [ ] Error handling: Pexels quota, ffmpeg failure, no clips found for keyword
+- [x] Job polling via Server-Sent Events (SSE) or 2s interval
+- [x] Progress bar during generation
+- [x] Download generated reel
+- [x] Error handling: Pexels quota, ffmpeg failure, no clips found for keyword
 
 ---
 
@@ -186,38 +187,38 @@ my-creator-studio/
 > Goal: End-to-end create → publish flow. Source: `instagram-automation-bot/` repo.
 
 ### 4.1 Instagram Account Manager
-- [ ] Add account — username + password → instagrapi login → session saved to SQLite
-- [ ] 2FA handling — prompt for code in UI
-- [ ] Challenge handling — show challenge type + instructions
-- [ ] Account cards showing: avatar, username, session status, last active
-- [ ] Remove account — clears session from DB
+- [x] Add account — username + password → instagrapi login → session saved to SQLite
+- [x] 2FA handling — prompt for code in UI
+- [x] Challenge handling — show challenge type + instructions
+- [x] Account cards showing: avatar, username, session status, last active
+- [x] Remove account — clears session from DB
 
 ### 4.2 Publish Page
-- [ ] Media picker — select from generated carousels or reels, or upload directly
-- [ ] Caption editor with character count + hashtag suggestions
-- [ ] Account selector (which account to post from)
-- [ ] Post type selector: Feed Post, Reel, Story, Carousel
-- [ ] Post Now button
-- [ ] Schedule — date/time picker → adds to schedule queue
+- [x] Media picker — select from generated carousels or reels, or upload directly
+- [x] Caption editor with character count + hashtag suggestions
+- [x] Account selector (which account to post from)
+- [x] Post type selector: Feed Post, Reel, Story, Carousel
+- [x] Post Now button
+- [x] Schedule — date/time picker → adds to schedule queue
 
 ### 4.3 Schedule Queue
-- [ ] List of scheduled posts (pending, posted, failed)
-- [ ] Cancel / reschedule
-- [ ] APScheduler running in Python background — fires posts at scheduled time
-- [ ] Retry on failure with notification in activity log
+- [x] List of scheduled posts (pending, posted, failed)
+- [x] Cancel / reschedule
+- [x] APScheduler running in Python background — fires posts at scheduled time
+- [x] Retry on failure with notification in activity log
 
 ### 4.4 Automation (from instagram-automation-bot)
-- [ ] Auto-reply rules — define keyword → reply template
-- [ ] Auto-like by hashtag — configure hashtag + daily limit
-- [ ] Auto-follow by hashtag
-- [ ] Activity log — real-time stream of all actions (SSE)
+- [x] Auto-reply rules — define keyword → reply template
+- [x] Auto-like by hashtag — configure hashtag + daily limit
+- [x] Auto-follow by hashtag
+- [x] Activity log — real-time stream of all actions (SSE)
 
 ### 4.5 Wire Up
-- [ ] `POST /instagram/post` — post immediately
-- [ ] `POST /instagram/schedule` — schedule post
-- [ ] `GET /instagram/queue` — list scheduled posts
-- [ ] `POST /instagram/auto-reply` — create/update rule
-- [ ] `GET /instagram/log` — SSE stream of activity log
+- [x] `POST /instagram/post` — post immediately
+- [x] `POST /instagram/schedule` — schedule post
+- [x] `GET /instagram/queue` — list scheduled posts
+- [x] `POST /instagram/auto-reply` — create/update rule
+- [x] `GET /instagram/log` — SSE stream of activity log
 
 ---
 
@@ -230,7 +231,23 @@ GEMINI_API_KEY=your_key_here
 # Pexels (stock footage)
 PEXELS_API_KEY=your_key_here
 
-# Internal API URL (set automatically by Docker Compose)
+# Meta Developer app (Instagram OAuth)
+INSTAGRAM_APP_ID=your_app_id
+INSTAGRAM_APP_SECRET=your_app_secret
+
+# Upstash Redis (job caching, rate limits)
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=your_token
+
+# Upstash QStash (durable scheduled posts)
+QSTASH_TOKEN=your_token
+QSTASH_CURRENT_SIGNING_KEY=your_key
+QSTASH_NEXT_SIGNING_KEY=your_key
+
+# PostgreSQL — set automatically by Railway via ${{Postgres.DATABASE_URL}}
+DATABASE_URL=postgresql://...
+
+# Internal API URL (set automatically by Docker Compose / Railway)
 API_URL=http://api:8000
 
 # Next.js (set automatically)
@@ -259,6 +276,8 @@ docker compose up --build
 
 ## Session Log
 
-| Date | Session | What was done | Stopped at |
-|------|---------|---------------|------------|
-| 2026-05-06 | 1 | Phase 1 complete: repo init, Next.js 16 dashboard shell, Python API skeleton, Settings page with health checks + guided setup, Docker Compose | Phase 2 — Carousel tool |
+| Date | Session | What was done |
+|------|---------|---------------|
+| 2026-05-06 | 1 | Phase 1 complete: repo init, Next.js 16 dashboard shell, Python API skeleton, Settings page with health checks + guided setup, Docker Compose |
+| 2026-05-06–09 | 2–N | Phases 2–4 complete: carousel generator, reel generator with APScheduler job queue, Instagram account management (password + OAuth), publish page, schedule queue, automation rules |
+| 2026-05-15 | — | Deployed to Railway (API + web + Postgres). Reel generation refactored to 2-phase progress (0→100% per phase) with smooth RAF animation. FastAPI `response_model` schema updated to expose `phase`/`phase_progress`. |

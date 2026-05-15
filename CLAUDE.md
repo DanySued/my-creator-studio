@@ -77,7 +77,7 @@ All models are in `api/models/database.py`. Key relationships:
 ## Architecture: Next.js frontend
 
 - **Route group `(dashboard)/`** — all authenticated pages share `layout.tsx` which wraps children with `<ReelGenerationProvider>` and renders `<GlobalReelStatus>` (floating reel job progress overlay)
-- **`contexts/ReelGenerationContext`** — global React context that tracks reel generation job state; components poll the job status endpoint via this context rather than managing their own state
+- **`lib/ReelGenerationContext.tsx`** — global React context that tracks reel generation job state; components poll the job status endpoint via this context rather than managing their own state
 - **UI components** — Radix UI primitives + shadcn/ui, styled with Tailwind CSS v4
 
 ## Environment variables
@@ -111,8 +111,26 @@ Both app services deploy automatically on push to `master`. The API healthcheck 
 
 ## Reel generation flow
 
-1. Client POSTs to `/api/reels/generate` (Next.js proxy → FastAPI)
-2. FastAPI creates a `ReelJob` record and queues an APScheduler job → returns `job_id`
-3. Background job: search Pexels → download clips → trim → concat → scale to 9:16 → mix audio → burn text overlay
-4. Client polls `/api/reels/job/[id]` for `status` and `progress` (0–100%)
-5. On completion, the final MP4 is at `MEDIA_DIR/generated/reels/{reel_id}/final.mp4`, served via FastAPI's `/media/` static mount
+Generation is split into two distinct phases with a user review step in between.
+
+**Phase 1 — Clip preparation** (`status: processing`, `phase: 1`, `phase_progress: 0→100`)
+1. Client POSTs to `/api/reels/generate` → FastAPI creates `ReelJob` + queues APScheduler job → returns `job_id`
+2. Background job: search Pexels → download raw clips → trim each to `duration / clip_count` seconds in parallel
+3. Job pauses: `status` → `awaiting_clip_approval`, `phase_progress` → `100`; clip paths stored in `ReelJob.clip_paths`
+
+**Clip approval** (user interaction — polling stops here until the user acts)
+4. Client polls `/api/reels/job/[id]` → detects `awaiting_clip_approval` → renders clip review UI with inline video previews
+5. User may replace individual clips: `POST /api/reels/clips/{job_id}/replace/{index}` (fetches a fresh Pexels clip)
+6. User approves: `POST /api/reels/clips/{job_id}/approve` → triggers phase 2, polling resumes
+
+**Phase 2 — Rendering** (`status: processing`, `phase: 2`, `phase_progress: 0→100`)
+7. Concat approved clips → scale to 9:16 (1080×1920) → mix audio → burn text overlays → `status: done`
+8. Final MP4 at `MEDIA_DIR/generated/reels/{reel_id}/final.mp4`, served via FastAPI's `/media/` static mount
+
+**Progress shape returned by `get_job_status()` / `ReelJobResponse`:**
+- `progress` — raw global 0–100 (kept for internal reference)
+- `phase` — `1` or `2`
+- `phase_progress` — 0–100 within the current phase (what the UI progress bar and text display)
+- `_compute_phase()` in `services/job_queue.py` derives `phase` and `phase_progress` from `status` + `progress`
+
+> **FastAPI `response_model` gotcha**: any field added to `get_job_status()` must also be declared in `ReelJobResponse` (`api/models/schemas.py`) or FastAPI silently strips it before serialization. This applies to all response fields across all routers.
