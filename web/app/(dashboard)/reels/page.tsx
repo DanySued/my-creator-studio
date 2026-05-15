@@ -242,7 +242,7 @@ export default function ReelsPage() {
     { id: '1', text: '', x: 50, y: 82, font: 'sans', bold: false, italic: false },
   ]);
   const [selectedOverlayId, setSelectedOverlayId] = useState('1');
-  const [noText, setNoText] = useState(false);
+  const [noText, setNoText] = useState(true);
   const nextOverlayId = useRef(2);
 
   const addOverlay = () => {
@@ -657,16 +657,6 @@ export default function ReelsPage() {
           <section>
             <h2 className="text-sm font-semibold text-foreground mb-3">3. Settings</h2>
             <div className="space-y-4 bg-secondary/50 rounded-xl border border-border p-5">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-2">Reel Title</label>
-                <input
-                  type="text"
-                  value={reelTitle}
-                  onChange={(e) => setReelTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-              </div>
-
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2">
                   Duration: <span className="text-foreground font-semibold">{duration}s</span>
