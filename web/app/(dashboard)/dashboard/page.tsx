@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GalleryHorizontal, Video, Send, ArrowRight, Sparkles, AlertCircle } from "lucide-react";
+import { GalleryHorizontal, Video, Send, ArrowRight, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -47,19 +47,6 @@ export default function OverviewPage() {
         </p>
       </div>
 
-      <div className="flex items-start gap-3 p-4 mb-8 rounded-xl border border-amber-400/20 bg-amber-400/5">
-        <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-amber-300">Finish setup to unlock all features</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Add your API keys and connect an Instagram account in{" "}
-            <Link href="/settings" className="text-amber-400 underline underline-offset-2">
-              Settings
-            </Link>{" "}
-            to get started.
-          </p>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TOOLS.map(({ href, icon: Icon, label, description, status, color, bg }) => (
