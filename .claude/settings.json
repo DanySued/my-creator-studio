@@ -1,5 +1,19 @@
 {
   "permissions": {
     "defaultMode": "bypassPermissions"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"C:/Users/danys/MyGithubRepos/my-creator-studio\" && TIMESTAMP=$(date +\"%Y-%m-%d %H:%M:%S\") && if ! git diff --quiet || ! git diff --cached --quiet || [ -n \"$(git ls-files --others --exclude-standard)\" ]; then git add -A && git commit -m \"auto: $TIMESTAMP\" && git push origin master && echo \"{\\\"systemMessage\\\": \\\"Deployed: pushed at $TIMESTAMP\\\"}\" ; else echo \"{\\\"systemMessage\\\": \\\"No changes — nothing to deploy\\\"}\"; fi",
+            "timeout": 60,
+            "statusMessage": "Committing and deploying to Railway…"
+          }
+        ]
+      }
+    ]
   }
 }
