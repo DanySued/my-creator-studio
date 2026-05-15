@@ -70,9 +70,11 @@ class ReelJob(BaseModel):
     """Background job status for reel generation."""
     id = CharField(primary_key=True)
     reel = ForeignKeyField(Reel, backref="jobs", null=True)
-    status = CharField(default="queued")  # queued, processing, done, failed
+    status = CharField(default="queued")  # queued, processing, awaiting_clip_approval, done, failed
     progress = IntegerField(default=0)  # 0-100
     error_message = TextField(null=True)
+    clip_paths = TextField(null=True)           # JSON array of trimmed clip file paths
+    pending_request_data = TextField(null=True) # JSON-encoded ReelGenerateRequest for phase 2
     created_at = DateTimeField(default=datetime.now)
     started_at = DateTimeField(null=True)
     completed_at = DateTimeField(null=True)
@@ -215,6 +217,15 @@ def init_db():
         InstagramAccount, ScheduledPost, ActivityLog,
         AutoReplyRule, FollowerSnapshot, AutoDMRule, DailyActionCount,
     ], safe=True)
+    # Safe migration: add columns that were added after initial schema creation
+    for table, col, col_type in [
+        ("reel_jobs", "clip_paths", "TEXT"),
+        ("reel_jobs", "pending_request_data", "TEXT"),
+    ]:
+        try:
+            db.execute_sql(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass  # Column already exists
 
 
 if __name__ == "__main__":

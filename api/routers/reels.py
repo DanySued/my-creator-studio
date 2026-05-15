@@ -13,8 +13,8 @@ from models.schemas import (
     AudioListResponse,
     AudioUploadResponse,
 )
-from models.database import Reel, AudioFile
-from services.job_queue import create_reel_generation_job, get_job_status
+from models.database import Reel, AudioFile, ReelJob
+from services.job_queue import create_reel_generation_job, get_job_status, approve_clips, replace_clip
 import subprocess
 import json
 
@@ -178,6 +178,81 @@ async def delete_audio(audio_id: str):
             raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
 
     audio.delete_instance()
+
+
+@router.get("/clips/{job_id}")
+async def get_clips(job_id: str):
+    """
+    Return metadata for clips awaiting approval.
+    Each clip has an index and a streaming URL.
+    """
+    try:
+        job = ReelJob.get_by_id(job_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.clip_paths:
+        raise HTTPException(status_code=404, detail="No clips available for this job")
+
+    try:
+        paths = json.loads(job.clip_paths)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to parse clip paths")
+
+    clips = [{"index": i, "url": f"/reels/clips/{job_id}/{i}"} for i in range(len(paths))]
+    return {"job_id": job_id, "clips": clips}
+
+
+@router.get("/clips/{job_id}/{index}")
+async def stream_clip(job_id: str, index: int):
+    """Stream a single trimmed clip video for preview."""
+    try:
+        job = ReelJob.get_by_id(job_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.clip_paths:
+        raise HTTPException(status_code=404, detail="No clips available for this job")
+
+    try:
+        paths = json.loads(job.clip_paths)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to parse clip paths")
+
+    if index < 0 or index >= len(paths):
+        raise HTTPException(status_code=404, detail=f"Clip index {index} out of range")
+
+    clip_path = paths[index]
+    if not os.path.exists(clip_path):
+        raise HTTPException(status_code=404, detail="Clip file not found on disk")
+
+    return FileResponse(path=clip_path, media_type="video/mp4")
+
+
+@router.post("/clips/{job_id}/approve")
+async def approve_clips_endpoint(job_id: str):
+    """Approve the clips and kick off phase 2 rendering."""
+    try:
+        approve_clips(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to approve clips: {str(e)}")
+
+    return {"status": "ok", "message": "Clips approved — rendering started"}
+
+
+@router.post("/clips/{job_id}/replace/{index}")
+async def replace_clip_endpoint(job_id: str, index: int):
+    """Replace clip at the given index with a fresh Pexels result."""
+    try:
+        await replace_clip(job_id, index)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to replace clip: {str(e)}")
+
+    return {"status": "ok", "message": f"Clip {index} replaced"}
 
 
 @router.get("/list", response_model=ReelListResponse)

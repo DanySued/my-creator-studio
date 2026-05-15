@@ -1,8 +1,15 @@
 """Background job queue management using APScheduler."""
+import asyncio
+import json
+import math
+import os
+import random
+import shutil
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.base import BaseTrigger
 
 from models.database import ReelJob, Reel
 from models.schemas import ReelGenerateRequest
@@ -16,11 +23,6 @@ from services.video import (
     burn_text_overlays,
     VideoProcessingError,
 )
-import os
-import math
-import random
-import shutil
-from concurrent.futures import ThreadPoolExecutor
 
 
 # Global scheduler instance
@@ -40,24 +42,18 @@ def create_reel_generation_job(request: ReelGenerateRequest) -> str:
     """
     Create a new reel generation job and queue it for processing.
 
-    Args:
-        request: Reel generation request parameters
-
-    Returns:
-        Job ID for status polling
+    Returns job ID for status polling.
     """
     from models.database import AudioFile
 
     job_id = str(uuid.uuid4())
     reel_id = str(uuid.uuid4())
 
-    # Validate audio file exists
     try:
         audio = AudioFile.get_by_id(request.audio_file_id)
     except Exception:
         raise ValueError("Audio file not found")
 
-    # Create job record
     try:
         reel = Reel.create(
             id=reel_id,
@@ -65,7 +61,7 @@ def create_reel_generation_job(request: ReelGenerateRequest) -> str:
             keywords=",".join(request.keywords),
             duration=request.duration,
             audio_path=audio.file_path,
-            output_path="",  # Will be set when complete
+            output_path="",
         )
         job = ReelJob.create(
             id=job_id,
@@ -76,10 +72,9 @@ def create_reel_generation_job(request: ReelGenerateRequest) -> str:
     except Exception as e:
         raise ValueError(f"Failed to create job: {str(e)}")
 
-    # Queue the job
     init_scheduler()
     scheduler.add_job(
-        _process_reel_generation,
+        _phase1_prepare_clips,
         args=(job_id, reel_id, request),
         id=job_id,
         name=f"reel_gen_{job_id}",
@@ -89,21 +84,16 @@ def create_reel_generation_job(request: ReelGenerateRequest) -> str:
     return job_id
 
 
-def _process_reel_generation(
+def _phase1_prepare_clips(
     job_id: str,
     reel_id: str,
     request: ReelGenerateRequest,
 ) -> None:
     """
-    Background job: Generate a reel from keywords and audio.
-
-    Args:
-        job_id: Job ID for tracking
-        reel_id: Reel ID
-        request: Generation request parameters
+    Background job phase 1: search Pexels, download, and trim clips.
+    Pauses at 50% with status 'awaiting_clip_approval' for user review.
     """
     try:
-        # Update job status
         job = ReelJob.get_by_id(job_id)
         job.status = "processing"
         job.started_at = datetime.now()
@@ -114,18 +104,15 @@ def _process_reel_generation(
         reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
         os.makedirs(reel_dir, exist_ok=True)
 
-        # Step 1: Search and download videos from Pexels (20%)
-        # Calculate how many clips we need upfront so we only download that many videos
-        # (plus 2 as a buffer for failures) instead of always downloading 10.
+        # Search and download videos (20%)
         job.progress = 20
         job.save()
 
         estimated_clips = max(1, round(request.duration / 4))
-        download_count = estimated_clips + 2  # buffer for any download failures
+        download_count = estimated_clips + 2
 
-        videos = []
+        video_paths = []
         try:
-            import asyncio
             fetch_pool = min(max(download_count * 3, 15), 80)
             video_list = asyncio_run(search_videos(request.keywords, per_page=fetch_pool))
             random.shuffle(video_list)
@@ -139,23 +126,20 @@ def _process_reel_generation(
                 ])
 
             asyncio_run(_download_all())
-            videos = video_paths
         except Exception as e:
             raise ValueError(f"Pexels integration failed: {str(e)}")
 
-        if not videos:
+        if not video_paths:
             raise ValueError("Could not download any videos from Pexels")
 
-        # Step 2: Trim videos to clips — 1 clip every 4 seconds (viralvibe formula)
-        # e.g. 30s reel → ~7-8 clips; each clip is ~4s. More dynamic than a fixed cap.
-        # Clips are trimmed in parallel — they're independent FFmpeg subprocesses.
+        # Trim clips in parallel (40%)
         job.progress = 40
         job.save()
 
         clips_dir = os.path.join(reel_dir, "clips")
         os.makedirs(clips_dir, exist_ok=True)
 
-        target_clip_count = min(max(1, round(request.duration / 4)), len(videos))
+        target_clip_count = min(max(1, round(request.duration / 4)), len(video_paths))
         clip_duration = request.duration / target_clip_count
 
         def _trim_one(args: tuple) -> str | None:
@@ -170,10 +154,10 @@ def _process_reel_generation(
                 return None
 
         with ThreadPoolExecutor(max_workers=target_clip_count) as pool:
-            results = list(pool.map(_trim_one, enumerate(videos[:target_clip_count])))
+            results = list(pool.map(_trim_one, enumerate(video_paths[:target_clip_count])))
         clips = [p for p in results if p is not None]
 
-        # Free raw downloads — no longer needed after trimming
+        # Free raw downloads
         for p in video_paths:
             try:
                 os.remove(p)
@@ -183,7 +167,7 @@ def _process_reel_generation(
         if not clips:
             raise ValueError("Could not create any video clips")
 
-        # If some clips failed, redistribute duration across survivors in parallel
+        # Retrim if some clips failed
         if len(clips) < target_clip_count:
             clip_duration = request.duration / len(clips)
 
@@ -202,26 +186,140 @@ def _process_reel_generation(
             with ThreadPoolExecutor(max_workers=len(clips)) as pool:
                 clips = list(pool.map(_retrim_one, enumerate(clips)))
 
-        # Step 3: Concatenate clips (60%)
+        # Pause for clip approval (50%)
+        job.clip_paths = json.dumps(clips)
+        job.pending_request_data = json.dumps(request.model_dump())
+        job.status = "awaiting_clip_approval"
+        job.progress = 50
+        job.save()
+
+        JOBS[job_id] = {
+            "status": "awaiting_clip_approval",
+            "progress": 50,
+            "clip_count": len(clips),
+            "error": None,
+        }
+
+    except Exception as e:
+        job = ReelJob.get_by_id(job_id)
+        job.status = "failed"
+        job.error_message = str(e)
+        job.completed_at = datetime.now()
+        job.save()
+        JOBS[job_id] = {"status": "failed", "progress": job.progress, "error": str(e)}
+        MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+        reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
+        shutil.rmtree(reel_dir, ignore_errors=True)
+
+
+def approve_clips(job_id: str) -> None:
+    """Approve the clips for a job and schedule phase 2 rendering."""
+    job = ReelJob.get_by_id(job_id)
+    if job.status != "awaiting_clip_approval":
+        raise ValueError(f"Job is not awaiting clip approval (status: {job.status})")
+
+    job.status = "processing"
+    job.progress = 55
+    job.save()
+
+    JOBS[job_id] = {"status": "processing", "progress": 55, "error": None}
+
+    init_scheduler()
+    scheduler.add_job(
+        _phase2_render_reel,
+        args=(job_id, str(job.reel_id)),
+        id=f"{job_id}_phase2",
+        name=f"reel_render_{job_id}",
+    )
+
+
+async def replace_clip(job_id: str, clip_index: int) -> None:
+    """Replace clip at clip_index with a freshly searched-and-trimmed clip."""
+    job = ReelJob.get_by_id(job_id)
+    if job.status != "awaiting_clip_approval":
+        raise ValueError(f"Job is not awaiting clip approval (status: {job.status})")
+    if not job.clip_paths:
+        raise ValueError("No clip paths stored for this job")
+
+    clips = json.loads(job.clip_paths)
+    if clip_index < 0 or clip_index >= len(clips):
+        raise ValueError(f"Clip index {clip_index} out of range (job has {len(clips)} clips)")
+
+    request_data = json.loads(job.pending_request_data)
+    request = ReelGenerateRequest(**request_data)
+    clip_duration = request.duration / len(clips)
+
+    # Search Pexels for replacement candidates
+    video_list = await search_videos(request.keywords, per_page=20)
+    random.shuffle(video_list)
+
+    MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+    reel_id = str(job.reel_id)
+    reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
+
+    loop = asyncio.get_running_loop()
+    target_clip_path = clips[clip_index]
+
+    for meta in video_list:
+        temp_path = os.path.join(reel_dir, f"replace_{clip_index}_{uuid.uuid4().hex[:6]}.mp4")
+        try:
+            await download_video(meta["url"], temp_path)
+            video_dur = await loop.run_in_executor(None, get_video_duration, temp_path)
+            start = random.uniform(0, max(0.0, video_dur - clip_duration))
+            await loop.run_in_executor(None, trim_video, temp_path, target_clip_path, start, clip_duration)
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+            return
+        except Exception:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    raise ValueError("Could not find a suitable replacement clip — try again")
+
+
+def _phase2_render_reel(job_id: str, reel_id: str) -> None:
+    """
+    Background job phase 2: concat, scale, mix audio, burn text.
+    Runs after the user approves the clips from phase 1.
+    """
+    try:
+        job = ReelJob.get_by_id(job_id)
+        clips = json.loads(job.clip_paths)
+        request_data = json.loads(job.pending_request_data)
+        request = ReelGenerateRequest(**request_data)
+
+        MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+        reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
+
+        # Concat clips (60%)
         job.progress = 60
         job.save()
+        JOBS[job_id] = {"status": "processing", "progress": 60, "error": None}
 
         concat_path = os.path.join(reel_dir, "concat.mp4")
         concatenate_videos(clips, concat_path)
-        # Free clips dir — no longer needed after concat
-        shutil.rmtree(clips_dir, ignore_errors=True)
+        # Free clips dir after concat
+        clips_dir = os.path.dirname(clips[0]) if clips else None
+        if clips_dir:
+            shutil.rmtree(clips_dir, ignore_errors=True)
 
-        # Step 4: Scale to Instagram Reels format (75%)
+        # Scale to Instagram Reels format (75%)
         job.progress = 75
         job.save()
+        JOBS[job_id]["progress"] = 75
 
         scaled_path = os.path.join(reel_dir, "scaled.mp4")
         scale_to_instagram_reels(concat_path, scaled_path)
         os.remove(concat_path)
 
-        # Step 5: Mix audio with optional start offset (90%)
+        # Mix audio (90%)
         job.progress = 90
         job.save()
+        JOBS[job_id]["progress"] = 90
 
         reel = Reel.get_by_id(reel_id)
         audio_mixed_path = os.path.join(reel_dir, "audio_mixed.mp4")
@@ -233,9 +331,10 @@ def _process_reel_generation(
         )
         os.remove(scaled_path)
 
-        # Step 6: Burn text overlays (95%)
+        # Burn text overlays (95%)
         job.progress = 95
         job.save()
+        JOBS[job_id]["progress"] = 95
 
         final_path = os.path.join(reel_dir, "final.mp4")
         active_overlays = [ov for ov in request.overlays if ov.text.strip()]
@@ -245,7 +344,7 @@ def _process_reel_generation(
         else:
             os.rename(audio_mixed_path, final_path)
 
-        # Step 7: Finalize (100%)
+        # Done (100%)
         job.progress = 100
         job.status = "done"
         job.completed_at = datetime.now()
@@ -262,37 +361,34 @@ def _process_reel_generation(
         job.completed_at = datetime.now()
         job.save()
         JOBS[job_id] = {"status": "failed", "progress": job.progress, "error": str(e)}
-        # Clean up temp files so a failed job doesn't leak disk space
         MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
         reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
         shutil.rmtree(reel_dir, ignore_errors=True)
 
 
 def get_job_status(job_id: str) -> dict:
-    """
-    Get the status of a reel generation job.
-
-    Args:
-        job_id: Job ID
-
-    Returns:
-        Job status dict
-    """
+    """Get the status of a reel generation job."""
     try:
         job = ReelJob.get_by_id(job_id)
+        clip_count = None
+        if job.clip_paths:
+            try:
+                clip_count = len(json.loads(job.clip_paths))
+            except Exception:
+                pass
         return {
             "job_id": job_id,
             "reel_id": job.reel.id if job.reel else None,
             "status": job.status,
             "progress": job.progress,
             "error_message": job.error_message,
+            "clip_count": clip_count,
             "created_at": job.created_at.isoformat(),
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
             "reels_done": 1 if job.status == "done" else 0,
             "reels_total": 1,
         }
     except Exception:
-        # Fallback to in-memory tracking
         if job_id in JOBS:
             mem = JOBS[job_id]
             return {
@@ -301,6 +397,7 @@ def get_job_status(job_id: str) -> dict:
                 "status": mem.get("status", "queued"),
                 "progress": mem.get("progress", 0),
                 "error_message": mem.get("error"),
+                "clip_count": mem.get("clip_count"),
                 "created_at": mem.get("created_at", datetime.now().isoformat()),
                 "completed_at": None,
                 "reels_done": 1 if mem.get("status") == "done" else 0,
@@ -348,7 +445,7 @@ def schedule_instagram_post(
         args=(post_id,),
         id=f"ig_post_{post_id}",
         name=f"ig_post_{post_id}",
-        misfire_grace_time=300,  # allow up to 5 min late if server was restarting
+        misfire_grace_time=300,
     )
 
     return {
@@ -371,10 +468,10 @@ def _execute_scheduled_post(post_id: str) -> None:
     try:
         post = ScheduledPost.get_by_id(post_id)
     except Exception:
-        return  # Row gone — nothing to do
+        return
 
     if post.status != "pending":
-        return  # Already cancelled or handled
+        return
 
     post.status = "posting"
     post.save()
@@ -397,7 +494,6 @@ def _execute_scheduled_post(post_id: str) -> None:
 
 def asyncio_run(coro):
     """Helper to run async functions from sync context."""
-    import asyncio
     import sys
 
     if sys.platform == "win32":

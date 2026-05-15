@@ -72,9 +72,10 @@ class ReelJobResponse(BaseModel):
     """Status of a reel generation job."""
     job_id: str
     reel_id: str | None
-    status: str  # queued, processing, done, failed
+    status: str  # queued, processing, awaiting_clip_approval, done, failed
     progress: int  # 0-100
     error_message: str | None = None
+    clip_count: int | None = None  # number of clips ready for review (when awaiting_clip_approval)
     created_at: datetime
     completed_at: datetime | None = None
     reels_done: int = 0   # how many variations have completed (for bulk jobs)

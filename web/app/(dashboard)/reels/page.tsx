@@ -34,12 +34,14 @@ function StatusLabel({ status }: { status: JobStatus['status'] }) {
   const labels: Record<JobStatus['status'], string> = {
     queued: 'Queued',
     processing: 'Processing',
+    awaiting_clip_approval: 'Review Clips',
     done: 'Complete',
     failed: 'Failed',
   };
   const colors: Record<JobStatus['status'], string> = {
     queued: 'text-muted-foreground',
     processing: 'text-blue-400',
+    awaiting_clip_approval: 'text-amber-400',
     done: 'text-emerald-400',
     failed: 'text-destructive',
   };
@@ -250,9 +252,45 @@ export default function ReelsPage() {
     { status: 'idle' } | { status: 'loading' } | { status: 'done'; freed_mb: number; dirs_cleaned: number }
   >({ status: 'idle' });
 
-  const { jobs, isGenerating, error, startGeneration, reset } = useReelGenerationContext();
+  const { jobs, isGenerating, error, startGeneration, approveClips, replaceClip, reset } = useReelGenerationContext();
 
   const isActive = jobs.length > 0 || isGenerating;
+  const awaitingApprovalJobs = jobs.filter((j) => j.status === 'awaiting_clip_approval');
+  const isAwaitingApproval = awaitingApprovalJobs.length > 0;
+
+  // clip_versions: bump to force video src re-fetch after a Replace
+  const [clipVersions, setClipVersions] = useState<Record<string, number>>({});
+  const [replacingClips, setReplacingClips] = useState<Set<string>>(new Set());
+  const [approvingJob, setApprovingJob] = useState<string | null>(null);
+  const [clipError, setClipError] = useState<string | null>(null);
+
+  const clipKey = (jobId: string, index: number) => `${jobId}-${index}`;
+
+  const handleReplaceClip = async (jobId: string, index: number) => {
+    const key = clipKey(jobId, index);
+    setReplacingClips((prev) => new Set(prev).add(key));
+    setClipError(null);
+    try {
+      await replaceClip(jobId, index);
+      setClipVersions((prev) => ({ ...prev, [key]: Date.now() }));
+    } catch (err) {
+      setClipError(err instanceof Error ? err.message : 'Replace failed');
+    } finally {
+      setReplacingClips((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    }
+  };
+
+  const handleApproveClips = async (jobId: string) => {
+    setApprovingJob(jobId);
+    setClipError(null);
+    try {
+      await approveClips(jobId);
+    } catch (err) {
+      setClipError(err instanceof Error ? err.message : 'Approve failed');
+    } finally {
+      setApprovingJob(null);
+    }
+  };
 
   const selectedAudio = audioFiles.find((a) => a.id === selectedAudioId) ?? null;
   const maxStartTime = selectedAudio ? Math.max(0, selectedAudio.duration - duration) : 0;
@@ -841,7 +879,7 @@ export default function ReelsPage() {
         </div>
       )}
 
-      {isActive && !allSettled && (
+      {isActive && !allSettled && !isAwaitingApproval && (
         <div className="space-y-5">
           <div className="flex flex-col items-center gap-5 py-12">
             <Loader2
@@ -891,6 +929,106 @@ export default function ReelsPage() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {isActive && isAwaitingApproval && (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h2 className="text-base font-semibold text-foreground">Review your clips</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Watch each clip — replace any you don&apos;t like, then approve to render the reel.
+            </p>
+          </div>
+
+          {clipError && <ErrorBanner message={clipError} />}
+
+          {awaitingApprovalJobs.map((job, jobIdx) => {
+            const clipCount = job.clip_count ?? 0;
+            return (
+              <div key={job.job_id} className="space-y-4">
+                {awaitingApprovalJobs.length > 1 && (
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Reel {jobIdx + 1} of {awaitingApprovalJobs.length}
+                  </p>
+                )}
+
+                <div
+                  className="grid gap-3"
+                  style={{ gridTemplateColumns: `repeat(${Math.min(clipCount, 3)}, 1fr)` }}
+                >
+                  {Array.from({ length: clipCount }, (_, i) => {
+                    const key = clipKey(job.job_id, i);
+                    const version = clipVersions[key] ?? 0;
+                    const isReplacing = replacingClips.has(key);
+                    return (
+                      <div
+                        key={i}
+                        className="flex flex-col gap-2 bg-secondary/50 rounded-xl border border-border p-2"
+                      >
+                        <div
+                          className="relative rounded-lg overflow-hidden bg-black"
+                          style={{ aspectRatio: '9 / 16' }}
+                        >
+                          {isReplacing ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                            </div>
+                          ) : (
+                            <video
+                              key={version}
+                              src={`/api/reels/clips/${job.job_id}/${i}?v=${version}`}
+                              className="w-full h-full object-cover"
+                              controls
+                              preload="metadata"
+                              muted
+                            />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleReplaceClip(job.job_id, i)}
+                          disabled={isReplacing || approvingJob === job.job_id}
+                          className="w-full py-1.5 rounded-lg text-xs font-medium border border-border bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                        >
+                          {isReplacing ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> Finding…</>
+                          ) : (
+                            'Replace Clip'
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handleApproveClips(job.job_id)}
+                  disabled={approvingJob === job.job_id || replacingClips.size > 0}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
+                >
+                  {approvingJob === job.job_id ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Starting render…</>
+                  ) : (
+                    'Approve & Generate Reel'
+                  )}
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Show progress for any jobs still processing (bulk case) */}
+          {jobs.filter((j) => j.status === 'processing' || j.status === 'queued').map((job) => (
+            <div key={job.job_id} className="p-4 bg-secondary/50 rounded-xl border border-border">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  <span className="text-xs font-medium text-foreground">Preparing clips…</span>
+                </div>
+                <span className="text-xs tabular-nums text-muted-foreground">{job.progress}%</span>
+              </div>
+              <ProgressBar progress={job.progress} status={job.status} />
+            </div>
+          ))}
         </div>
       )}
 

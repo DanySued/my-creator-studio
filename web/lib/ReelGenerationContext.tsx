@@ -12,9 +12,10 @@ import {
 export interface JobStatus {
   job_id: string;
   reel_id: string | null;
-  status: 'queued' | 'processing' | 'done' | 'failed';
+  status: 'queued' | 'processing' | 'awaiting_clip_approval' | 'done' | 'failed';
   progress: number;
   error_message: string | null;
+  clip_count: number | null;
   created_at: string;
   completed_at: string | null;
 }
@@ -46,6 +47,8 @@ interface ReelGenerationContextValue {
     songStartTime?: number,
     overlay?: OverlayOptions
   ) => Promise<void>;
+  approveClips: (jobId: string) => Promise<void>;
+  replaceClip: (jobId: string, index: number) => Promise<void>;
   reset: () => void;
   dismiss: () => void;
 }
@@ -89,6 +92,7 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
           const timer = setTimeout(poll, POLL_INTERVAL);
           pollerTimers.current.set(jobId, timer);
         } else {
+          // Stop polling on terminal states (awaiting_clip_approval, done, failed)
           pollerTimers.current.delete(jobId);
           activePollers.current.delete(jobId);
           if (activePollers.current.size === 0) setIsGenerating(false);
@@ -158,6 +162,28 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
     [startPolling]
   );
 
+  const approveClips = useCallback(
+    async (jobId: string) => {
+      const res = await fetch(`/api/reels/clips/${jobId}/approve`, { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Failed to approve clips');
+      }
+      // Resume polling — status flips back to 'processing'
+      setIsGenerating(true);
+      startPolling(jobId);
+    },
+    [startPolling]
+  );
+
+  const replaceClip = useCallback(async (jobId: string, index: number) => {
+    const res = await fetch(`/api/reels/clips/${jobId}/replace/${index}`, { method: 'POST' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || 'Failed to replace clip');
+    }
+  }, []);
+
   const reset = useCallback(() => {
     pollerTimers.current.forEach((t) => clearTimeout(t));
     pollerTimers.current.clear();
@@ -172,7 +198,7 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
 
   return (
     <ReelGenerationContext.Provider
-      value={{ jobs, isGenerating, error, isDismissed, startGeneration, reset, dismiss }}
+      value={{ jobs, isGenerating, error, isDismissed, startGeneration, approveClips, replaceClip, reset, dismiss }}
     >
       {children}
     </ReelGenerationContext.Provider>

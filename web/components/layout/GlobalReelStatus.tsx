@@ -14,6 +14,7 @@ export function GlobalReelStatus() {
   const hasActivity = jobs.length > 0 || isGenerating;
   const allSettled =
     jobs.length > 0 && jobs.every((j) => j.status === 'done' || j.status === 'failed');
+  const awaitingApproval = jobs.some((j) => j.status === 'awaiting_clip_approval');
   const doneCount = jobs.filter((j) => j.status === 'done').length;
   const overallProgress =
     jobs.length > 0
@@ -36,19 +37,23 @@ export function GlobalReelStatus() {
         >
           <div className="flex items-center gap-3 px-4 py-3 bg-surface-panel border border-white/10 rounded-2xl shadow-2xl backdrop-blur-md min-w-[220px]">
             {!allSettled ? (
-              /* ── Generating ── */
+              /* ── Generating / Awaiting Approval ── */
               <>
                 <Loader2
-                  className="w-7 h-7 shrink-0 animate-spin text-blue-400"
+                  className={`w-7 h-7 shrink-0 animate-spin ${awaitingApproval ? 'text-amber-400' : 'text-blue-400'}`}
                   style={{ animationDuration: '1.8s' }}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-white truncate">
-                    {jobs.length > 1
-                      ? `Generating ${jobs.length} reels…`
-                      : 'Generating reel…'}
+                    {awaitingApproval
+                      ? 'Review clips →'
+                      : jobs.length > 1
+                        ? `Generating ${jobs.length} reels…`
+                        : 'Generating reel…'}
                   </p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{overallProgress}% complete</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    {awaitingApproval ? 'Tap to approve or swap clips' : `${overallProgress}% complete`}
+                  </p>
                 </div>
               </>
             ) : (
