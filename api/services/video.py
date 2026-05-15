@@ -70,6 +70,7 @@ def trim_video(
         "-t", str(duration),
         "-r", "30",       # lock to 30fps — consistent with viralvibe standard
         "-c:v", "libx264",
+        "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
         "-y",
@@ -125,6 +126,7 @@ def concatenate_videos(
         "-i", concat_file,
         "-r", "30",
         "-c:v", "libx264",  # re-encode so keyframes align at cut points (no glitches)
+        "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
         "-y",
@@ -171,6 +173,7 @@ def scale_to_instagram_reels(
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-r", "30",
         "-c:v", "libx264",
+        "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
         "-y",
@@ -271,6 +274,7 @@ def burn_text_overlay(
         "-vf",
         f"drawtext=text='{text}':fontsize=60:fontcolor=white:x={x_expr}:y={y_expr}:shadowx=2:shadowy=2:shadowcolor=black",
         "-c:v", "libx264",
+        "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "copy",
         "-y",

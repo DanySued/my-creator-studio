@@ -19,6 +19,7 @@ from services.video import (
 import os
 import math
 import random
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Global scheduler instance
@@ -113,14 +114,19 @@ def _process_reel_generation(
         os.makedirs(reel_dir, exist_ok=True)
 
         # Step 1: Search and download videos from Pexels (20%)
+        # Calculate how many clips we need upfront so we only download that many videos
+        # (plus 2 as a buffer for failures) instead of always downloading 10.
         job.progress = 20
         job.save()
+
+        estimated_clips = max(1, round(request.duration / 4))
+        download_count = estimated_clips + 2  # buffer for any download failures
 
         videos = []
         try:
             import asyncio
-            video_list = asyncio_run(search_videos(request.keywords, per_page=5))
-            candidates = video_list[:10]
+            video_list = asyncio_run(search_videos(request.keywords, per_page=max(3, estimated_clips + 1)))
+            candidates = video_list[:download_count]
             video_paths = [os.path.join(reel_dir, f"video_{i}.mp4") for i in range(len(candidates))]
 
             async def _download_all():
@@ -139,45 +145,51 @@ def _process_reel_generation(
 
         # Step 2: Trim videos to clips — 1 clip every 4 seconds (viralvibe formula)
         # e.g. 30s reel → ~7-8 clips; each clip is ~4s. More dynamic than a fixed cap.
+        # Clips are trimmed in parallel — they're independent FFmpeg subprocesses.
         job.progress = 40
         job.save()
 
         clips_dir = os.path.join(reel_dir, "clips")
         os.makedirs(clips_dir, exist_ok=True)
-        clips = []
 
         target_clip_count = min(max(1, round(request.duration / 4)), len(videos))
         clip_duration = request.duration / target_clip_count
 
-        for i, video in enumerate(videos[:target_clip_count]):
+        def _trim_one(args: tuple) -> str | None:
+            idx, video_path = args
             try:
-                video_duration = get_video_duration(video)
-                max_start = max(0.0, video_duration - clip_duration)
-                start_time = random.uniform(0, max_start)
-                clip_path = os.path.join(clips_dir, f"clip_{i}.mp4")
-                trim_video(video, clip_path, start_time, clip_duration)
-                clips.append(clip_path)
+                video_dur = get_video_duration(video_path)
+                start = random.uniform(0, max(0.0, video_dur - clip_duration))
+                clip_path = os.path.join(clips_dir, f"clip_{idx}.mp4")
+                trim_video(video_path, clip_path, start, clip_duration)
+                return clip_path
             except Exception:
-                continue
+                return None
+
+        with ThreadPoolExecutor(max_workers=target_clip_count) as pool:
+            results = list(pool.map(_trim_one, enumerate(videos[:target_clip_count])))
+        clips = [p for p in results if p is not None]
 
         if not clips:
             raise ValueError("Could not create any video clips")
 
-        # If some clips failed, redistribute duration across the survivors
+        # If some clips failed, redistribute duration across survivors in parallel
         if len(clips) < target_clip_count:
             clip_duration = request.duration / len(clips)
-            retrimmed = []
-            for i, clip in enumerate(clips):
+
+            def _retrim_one(args: tuple) -> str:
+                idx, clip_path = args
                 try:
-                    video_duration = get_video_duration(clip)
-                    max_start = max(0.0, video_duration - clip_duration)
-                    start_time = random.uniform(0, max_start)
-                    retrimmed_path = clip.replace(f"clip_{i}.mp4", f"clip_{i}_rt.mp4")
-                    trim_video(clip, retrimmed_path, start_time, clip_duration)
-                    retrimmed.append(retrimmed_path)
+                    video_dur = get_video_duration(clip_path)
+                    start = random.uniform(0, max(0.0, video_dur - clip_duration))
+                    retrimmed_path = clip_path.replace(f"clip_{idx}.mp4", f"clip_{idx}_rt.mp4")
+                    trim_video(clip_path, retrimmed_path, start, clip_duration)
+                    return retrimmed_path
                 except Exception:
-                    retrimmed.append(clip)
-            clips = retrimmed
+                    return clip_path
+
+            with ThreadPoolExecutor(max_workers=len(clips)) as pool:
+                clips = list(pool.map(_retrim_one, enumerate(clips)))
 
         # Step 3: Concatenate clips (60%)
         job.progress = 60
