@@ -126,7 +126,9 @@ def _process_reel_generation(
         videos = []
         try:
             import asyncio
-            video_list = asyncio_run(search_videos(request.keywords, per_page=max(3, estimated_clips + 1)))
+            fetch_pool = min(max(download_count * 3, 15), 80)
+            video_list = asyncio_run(search_videos(request.keywords, per_page=fetch_pool))
+            random.shuffle(video_list)
             candidates = video_list[:download_count]
             video_paths = [os.path.join(reel_dir, f"video_{i}.mp4") for i in range(len(candidates))]
 
