@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Loader2,
   Upload,
+  Trash2,
 } from 'lucide-react';
 import { KeywordEngine } from '@/components/reels/KeywordEngine';
 import { JobStatus, useReelGenerationContext } from '@/lib/ReelGenerationContext';
@@ -101,9 +102,24 @@ export default function ReelsPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
 
+  const [cleanupState, setCleanupState] = useState<
+    { status: 'idle' } | { status: 'loading' } | { status: 'done'; freed_mb: number; dirs_cleaned: number }
+  >({ status: 'idle' });
+
   const { jobs, isGenerating, error, startGeneration, reset } = useReelGenerationContext();
 
   const isActive = jobs.length > 0 || isGenerating;
+
+  const handleCleanup = async () => {
+    setCleanupState({ status: 'loading' });
+    try {
+      const res = await fetch('/api/reels/cleanup-temp', { method: 'POST' });
+      const data = await res.json();
+      setCleanupState({ status: 'done', freed_mb: data.freed_mb ?? 0, dirs_cleaned: data.dirs_cleaned ?? 0 });
+    } catch {
+      setCleanupState({ status: 'idle' });
+    }
+  };
   const allSettled = jobs.length > 0 && jobs.every((j) => j.status === 'done' || j.status === 'failed');
   const doneJobs = jobs.filter((j) => j.status === 'done' && j.reel_id);
 
@@ -332,6 +348,25 @@ export default function ReelsPage() {
           {(validationError || error) && (
             <ErrorBanner message={validationError || error!} />
           )}
+
+          <div className="flex items-center justify-between pt-1">
+            <button
+              onClick={handleCleanup}
+              disabled={cleanupState.status === 'loading'}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-secondary hover:bg-secondary/80 border border-border text-muted-foreground hover:text-foreground rounded-xl text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {cleanupState.status === 'loading' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5" />
+              )}
+              {cleanupState.status === 'loading'
+                ? 'Cleaning…'
+                : cleanupState.status === 'done'
+                  ? `Freed ${cleanupState.freed_mb} MB`
+                  : 'Free Up Space'}
+            </button>
+          </div>
 
           <button
             onClick={handleGenerate}
