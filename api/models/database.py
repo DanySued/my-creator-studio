@@ -1,4 +1,4 @@
-"""Database models using Peewee ORM — SQLite locally, PostgreSQL (Supabase) in production."""
+"""Database models using Peewee ORM — SQLite locally, PostgreSQL (Railway) in production."""
 import os
 import urllib.parse
 from datetime import datetime
@@ -19,19 +19,12 @@ if _DATABASE_URL:
 else:
     from peewee import SqliteDatabase
     _data_dir = os.getenv("DATA_DIR", "/data")
-    os.makedirs(_data_dir, exist_ok=True)
     db = SqliteDatabase(os.path.join(_data_dir, "studio.db"))
 
 
 class BaseModel(Model):
-    """Base model for all tables."""
     class Meta:
         database = db
-
-    @classmethod
-    def get_by_id(cls, item_id):
-        """Get a record by its ID."""
-        return cls.get(cls.id == item_id)
 
 
 class Carousel(BaseModel):
@@ -214,6 +207,8 @@ class DailyActionCount(BaseModel):
 # Create tables on import
 def init_db():
     """Initialize database tables."""
+    if not _DATABASE_URL:
+        os.makedirs(os.path.dirname(db.database), exist_ok=True)
     db.create_tables([
         Carousel, CarouselSlide,
         Reel, ReelJob, AudioFile,

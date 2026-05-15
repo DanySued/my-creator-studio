@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +14,24 @@ from services.job_queue import init_scheduler
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="My Creator Studio API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as exc:
+        # Log and continue — the app must start so the healthcheck responds.
+        logger.error("Database init failed — DB-dependent routes will fail until resolved: %s", exc)
+    try:
+        init_scheduler()
+        logger.info("Scheduler started")
+    except Exception as exc:
+        logger.error("Scheduler init failed: %s", exc)
+    yield
+
+
+app = FastAPI(title="My Creator Studio API", version="1.0.0", lifespan=lifespan)
 
 _origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
@@ -33,24 +51,10 @@ app.include_router(automation.router, prefix="/automation", tags=["automation"])
 MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
 if os.path.isdir(MEDIA_DIR):
     app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+else:
+    logger.warning("MEDIA_DIR %s not found — /media endpoint will not be available", MEDIA_DIR)
 
 
 @app.get("/")
 def root():
     return {"status": "ok", "service": "my-creator-studio-api"}
-
-
-@app.on_event("startup")
-async def startup():
-    try:
-        init_db()
-        logger.info("Database initialized")
-    except Exception as exc:
-        # Log and continue — the app must start so the healthcheck responds.
-        # DB-dependent routes will fail until the connection is available.
-        logger.error("Database init failed (will retry on next request): %s", exc)
-    try:
-        init_scheduler()
-        logger.info("Scheduler started")
-    except Exception as exc:
-        logger.error("Scheduler init failed: %s", exc)

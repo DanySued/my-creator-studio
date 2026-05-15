@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import httpx
 import os
+from models.database import db
 
 router = APIRouter()
 
@@ -33,7 +34,6 @@ async def test_gemini(payload: KeyPayload):
     if not r.is_success:
         raise HTTPException(status_code=r.status_code, detail=f"Gemini error: {r.text[:200]}")
 
-    # Persist key to env file so backend can use it going forward
     _save_env_key("GEMINI_API_KEY", payload.apiKey)
     return {"ok": True}
 
@@ -65,18 +65,15 @@ async def test_pexels(payload: KeyPayload):
 @router.get("/backend")
 def backend_health():
     """Liveness check — reports DB connectivity so Railway healthcheck can track it."""
-    from models.database import db
-    db_ok = False
     db_error = None
     try:
-        db.connect(reuse_if_open=True)
-        db.execute_sql("SELECT 1")
-        db_ok = True
+        with db.connection_context():
+            db.execute_sql("SELECT 1")
     except Exception as exc:
         db_error = str(exc)
     return {
         "ok": True,
-        "db": db_ok,
+        "db": db_error is None,
         "db_error": db_error,
         "gemini_configured": bool(os.getenv("GEMINI_API_KEY")),
         "pexels_configured": bool(os.getenv("PEXELS_API_KEY")),
@@ -84,15 +81,16 @@ def backend_health():
 
 
 def _save_env_key(key: str, value: str):
-    """Append or update a key in /api/data/.env.keys (persistent across restarts)."""
+    """Append or update a key in $DATA_DIR/.env.keys (persistent across restarts)."""
     env_file = os.path.join(os.getenv("DATA_DIR", "/data"), ".env.keys")
+    os.makedirs(os.path.dirname(env_file), exist_ok=True)
     lines = []
-    if os.path.exists(env_file):
+    try:
         with open(env_file) as f:
             lines = [l for l in f.readlines() if not l.startswith(f"{key}=")]
+    except FileNotFoundError:
+        pass
     lines.append(f"{key}={value}\n")
-    os.makedirs(os.path.dirname(env_file), exist_ok=True)
     with open(env_file, "w") as f:
         f.writelines(lines)
-    # Also update the current process env
     os.environ[key] = value
