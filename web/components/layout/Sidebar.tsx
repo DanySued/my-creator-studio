@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   GalleryHorizontal,
@@ -11,6 +11,7 @@ import {
   Settings,
   Sparkles,
   Bot,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
@@ -39,6 +41,13 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 p-2 flex-1">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-3 px-3 h-9 rounded-lg transition-all duration-150 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] mb-1"
+        >
+          <ArrowLeft className="w-4 h-4 shrink-0" />
+          Go Back
+        </button>
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
           <Link
             key={href}

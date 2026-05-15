@@ -701,13 +701,13 @@ export default function ReelsPage() {
               {isBulk && (
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-2">Number of reels</label>
-                  <div className="flex gap-2">
-                    {[2, 3, 5].map((n) => (
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                       <button
                         key={n}
                         onClick={() => setReelCount(n)}
                         className={cn(
-                          'px-5 py-2 rounded-xl text-sm font-semibold border transition-all',
+                          'py-2 rounded-xl text-sm font-semibold border transition-all',
                           reelCount === n
                             ? 'bg-violet-500/15 border-violet-400/40 text-violet-400'
                             : 'bg-secondary border-border text-muted-foreground hover:border-violet-400/30 hover:text-violet-400'
@@ -878,7 +878,7 @@ export default function ReelsPage() {
             {isBulk ? (
               <>
                 <Layers className="w-4 h-4" />
-                Generate {reelCount} Reels
+                Generate {reelCount} {reelCount === 1 ? 'Reel' : 'Reels'}
               </>
             ) : (
               'Generate Reel'
@@ -889,6 +889,15 @@ export default function ReelsPage() {
 
       {isActive && !allSettled && !isAwaitingApproval && (
         <div className="space-y-5">
+          <div className="flex justify-end">
+            <button
+              onClick={reset}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium border border-border bg-secondary hover:bg-destructive/10 hover:border-destructive/40 hover:text-destructive text-muted-foreground transition-colors"
+            >
+              <Square className="w-3 h-3" />
+              Stop
+            </button>
+          </div>
           <div className="flex flex-col items-center gap-5 py-12">
             <Loader2
               className="w-12 h-12 animate-spin text-primary"
