@@ -16,6 +16,10 @@ export async function POST(request: NextRequest) {
         duration: body.duration || 15,
         title: body.title || 'Generated Reel',
         song_start_time: body.songStartTime || 0,
+        overlay_text: body.overlayText ?? '',
+        overlay_x: body.overlayX ?? 50,
+        overlay_y: body.overlayY ?? 82,
+        no_text: body.noText ?? false,
       }),
     });
 

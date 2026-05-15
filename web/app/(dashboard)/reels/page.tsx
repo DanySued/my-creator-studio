@@ -71,6 +71,86 @@ function ProgressBar({ progress, status }: { progress: number; status: JobStatus
   );
 }
 
+function TextOverlayPreview({
+  text,
+  position,
+  onPositionChange,
+}: {
+  text: string;
+  position: { x: number; y: number };
+  onPositionChange: (pos: { x: number; y: number }) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const clamp = (v: number) => Math.max(5, Math.min(95, v));
+
+  const posFromClient = (clientX: number, clientY: number) => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return {
+      x: clamp(((clientX - rect.left) / rect.width) * 100),
+      y: clamp(((clientY - rect.top) / rect.height) * 100),
+    };
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative rounded-2xl overflow-hidden border border-border select-none shrink-0"
+      style={{
+        width: '160px',
+        aspectRatio: '9 / 16',
+        background: 'linear-gradient(160deg, #27272a 0%, #18181b 50%, #09090b 100%)',
+      }}
+      onMouseMove={(e) => { if (dragging.current) onPositionChange(posFromClient(e.clientX, e.clientY)); }}
+      onMouseUp={() => { dragging.current = false; }}
+      onMouseLeave={() => { dragging.current = false; }}
+    >
+      {/* scanlines */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.035]"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, white 2px, white 3px)',
+        }}
+      />
+      {/* play icon hint */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center">
+          <div className="w-0 h-0 border-y-[6px] border-y-transparent border-l-[10px] border-l-white/15 ml-1" />
+        </div>
+      </div>
+      {/* drag hint */}
+      <p className="absolute bottom-2 inset-x-0 text-center text-[8px] text-white/25 pointer-events-none">
+        drag to reposition
+      </p>
+      {/* draggable text pill */}
+      <div
+        className="absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing z-10"
+        style={{ left: `${position.x}%`, top: `${position.y}%` }}
+        onMouseDown={(e) => { e.preventDefault(); dragging.current = true; }}
+        onTouchStart={(e) => { e.preventDefault(); dragging.current = true; }}
+        onTouchMove={(e) => {
+          if (!dragging.current) return;
+          const t = e.touches[0];
+          onPositionChange(posFromClient(t.clientX, t.clientY));
+        }}
+        onTouchEnd={() => { dragging.current = false; }}
+      >
+        <span
+          className={cn(
+            'block px-2 py-0.5 rounded text-[10px] font-bold shadow-lg max-w-[130px] truncate text-center',
+            text
+              ? 'bg-black/60 text-white border border-white/20'
+              : 'bg-black/30 text-white/30 border border-dashed border-white/15 italic'
+          )}
+        >
+          {text || 'Your text here'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function VideoPreview({ reelId, label }: { reelId: string; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 w-full">
@@ -109,6 +189,10 @@ export default function ReelsPage() {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [overlayText, setOverlayText] = useState('');
+  const [textPosition, setTextPosition] = useState({ x: 50, y: 82 });
+  const [noText, setNoText] = useState(false);
 
   const [cleanupState, setCleanupState] = useState<
     { status: 'idle' } | { status: 'loading' } | { status: 'done'; freed_mb: number; dirs_cleaned: number }
@@ -220,7 +304,15 @@ export default function ReelsPage() {
     }
     setValidationError(null);
     setPreviewIndex(0);
-    await startGeneration(isBulk ? reelCount : 1, keywords, selectedAudioId, duration, reelTitle, effectiveSongStartTime);
+    await startGeneration(
+      isBulk ? reelCount : 1,
+      keywords,
+      selectedAudioId,
+      duration,
+      reelTitle,
+      effectiveSongStartTime,
+      { overlayText, overlayX: textPosition.x, overlayY: textPosition.y, noText }
+    );
   };
 
   const handleDownload = (reelId: string, index?: number) => {
@@ -442,6 +534,60 @@ export default function ReelsPage() {
                 </div>
               )}
             </div>
+          </section>
+
+          {/* Text Overlay */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-foreground">4. Text Overlay</h2>
+              <button
+                onClick={() => setNoText(!noText)}
+                className={cn(
+                  'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none',
+                  !noText ? 'bg-primary' : 'bg-secondary border border-border'
+                )}
+                aria-label="Toggle text overlay"
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                    !noText ? 'translate-x-5' : 'translate-x-0'
+                  )}
+                />
+              </button>
+            </div>
+
+            {!noText ? (
+              <div className="flex gap-5 items-start bg-secondary/50 rounded-xl border border-border p-4">
+                <div className="flex-1 space-y-3 min-w-0">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-2">Overlay Text</label>
+                    <input
+                      type="text"
+                      value={overlayText}
+                      onChange={(e) => setOverlayText(e.target.value)}
+                      placeholder={`Uses "${reelTitle}" if blank`}
+                      className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Position:{' '}
+                    <span className="text-foreground tabular-nums">
+                      {Math.round(textPosition.x)}% left · {Math.round(textPosition.y)}% top
+                    </span>
+                  </p>
+                </div>
+                <TextOverlayPreview
+                  text={overlayText || reelTitle}
+                  position={textPosition}
+                  onPositionChange={setTextPosition}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground bg-secondary/50 rounded-xl border border-border px-4 py-3">
+                No text will be added to the reel.
+              </p>
+            )}
           </section>
 
           {(validationError || error) && (

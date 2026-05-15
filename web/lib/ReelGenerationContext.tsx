@@ -19,6 +19,13 @@ export interface JobStatus {
   completed_at: string | null;
 }
 
+interface OverlayOptions {
+  overlayText?: string;
+  overlayX?: number;
+  overlayY?: number;
+  noText?: boolean;
+}
+
 interface ReelGenerationContextValue {
   jobs: JobStatus[];
   isGenerating: boolean;
@@ -30,7 +37,8 @@ interface ReelGenerationContextValue {
     audioFileId: string,
     duration: number,
     title: string,
-    songStartTime?: number
+    songStartTime?: number,
+    overlay?: OverlayOptions
   ) => Promise<void>;
   reset: () => void;
   dismiss: () => void;
@@ -96,7 +104,8 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
       audioFileId: string,
       duration: number,
       title: string,
-      songStartTime: number = 0
+      songStartTime: number = 0,
+      overlay: OverlayOptions = {}
     ) => {
       setError(null);
       setIsGenerating(true);
@@ -117,6 +126,10 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
               duration,
               title: count > 1 ? `${title} ${i + 1}` : title,
               songStartTime,
+              overlayText: overlay.overlayText ?? '',
+              overlayX: overlay.overlayX ?? 50,
+              overlayY: overlay.overlayY ?? 82,
+              noText: overlay.noText ?? false,
             }),
           })
         );
