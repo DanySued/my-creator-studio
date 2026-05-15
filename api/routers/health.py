@@ -64,9 +64,20 @@ async def test_pexels(payload: KeyPayload):
 
 @router.get("/backend")
 def backend_health():
-    """Simple liveness check — if this returns, the backend is up."""
+    """Liveness check — reports DB connectivity so Railway healthcheck can track it."""
+    from models.database import db
+    db_ok = False
+    db_error = None
+    try:
+        db.connect(reuse_if_open=True)
+        db.execute_sql("SELECT 1")
+        db_ok = True
+    except Exception as exc:
+        db_error = str(exc)
     return {
         "ok": True,
+        "db": db_ok,
+        "db_error": db_error,
         "gemini_configured": bool(os.getenv("GEMINI_API_KEY")),
         "pexels_configured": bool(os.getenv("PEXELS_API_KEY")),
     }
