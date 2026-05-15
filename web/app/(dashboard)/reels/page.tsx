@@ -204,6 +204,7 @@ export default function ReelsPage() {
   const [isBulk, setIsBulk] = useState(false);
   const [reelCount, setReelCount] = useState(3);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -319,7 +320,7 @@ export default function ReelsPage() {
   const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setIsLoadingAudio(true);
+    setIsUploading(true);
     setAudioError(null);
     try {
       const formData = new FormData();
@@ -335,7 +336,7 @@ export default function ReelsPage() {
     } catch (err) {
       setAudioError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      setIsLoadingAudio(false);
+      setIsUploading(false);
       e.target.value = '';
     }
   };
@@ -493,15 +494,31 @@ export default function ReelsPage() {
             )}
 
             <div className="mt-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground rounded-xl cursor-pointer text-sm font-medium transition-colors">
-                <Upload className="w-3.5 h-3.5" />
-                Upload Audio
+              <label
+                className={cn(
+                  'inline-flex items-center gap-2 px-4 py-2 border rounded-xl text-sm font-medium transition-colors',
+                  isUploading
+                    ? 'bg-secondary/60 border-border text-muted-foreground cursor-not-allowed opacity-70'
+                    : 'bg-secondary hover:bg-secondary/80 border-border text-foreground cursor-pointer'
+                )}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload Audio
+                  </>
+                )}
                 <input
                   type="file"
                   accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/x-m4a,audio/mp3,.mp3,.wav,.m4a,.ogg"
                   onChange={handleAudioUpload}
                   className="hidden"
-                  disabled={isLoadingAudio}
+                  disabled={isLoadingAudio || isUploading}
                 />
               </label>
             </div>
