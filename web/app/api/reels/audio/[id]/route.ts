@@ -8,16 +8,30 @@ export async function GET(
     const { id } = await params;
     const apiUrl = process.env.API_URL || 'http://localhost:8000';
 
-    const response = await fetch(`${apiUrl}/reels/audio/${id}`, { method: 'GET' });
+    const upstreamHeaders: HeadersInit = {};
+    const range = request.headers.get('range');
+    if (range) upstreamHeaders['Range'] = range;
 
-    if (!response.ok) {
+    const response = await fetch(`${apiUrl}/reels/audio/${id}`, {
+      method: 'GET',
+      headers: upstreamHeaders,
+    });
+
+    if (!response.ok && response.status !== 206) {
       return NextResponse.json({ error: 'Audio not found' }, { status: response.status });
     }
 
-    const contentType = response.headers.get('content-type') || 'audio/mpeg';
+    const responseHeaders: Record<string, string> = {
+      'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
+    };
+    for (const h of ['content-range', 'accept-ranges', 'content-length']) {
+      const v = response.headers.get(h);
+      if (v) responseHeaders[h] = v;
+    }
+
     return new NextResponse(response.body, {
-      status: 200,
-      headers: { 'Content-Type': contentType },
+      status: response.status,
+      headers: responseHeaders,
     });
   } catch (error) {
     return NextResponse.json({ error: `Failed to stream audio: ${error}` }, { status: 500 });
