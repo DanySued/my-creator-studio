@@ -13,7 +13,7 @@ from services.video import (
     concatenate_videos,
     scale_to_instagram_reels,
     mix_audio,
-    burn_text_overlay,
+    burn_text_overlays,
     VideoProcessingError,
 )
 import os
@@ -231,27 +231,17 @@ def _process_reel_generation(
         )
         os.remove(scaled_path)
 
-        # Step 6: Burn text overlay unless no_text is set (95%)
+        # Step 6: Burn text overlays (95%)
         job.progress = 95
         job.save()
 
         final_path = os.path.join(reel_dir, "final.mp4")
-        if request.no_text:
-            # Rename audio_mixed directly to final — no overlay step
-            os.rename(audio_mixed_path, final_path)
+        active_overlays = [ov for ov in request.overlays if ov.text.strip()]
+        if active_overlays:
+            burn_text_overlays(audio_mixed_path, final_path, active_overlays)
+            os.remove(audio_mixed_path)
         else:
-            text = (request.overlay_text.strip() or request.title or "").strip()
-            if text:
-                burn_text_overlay(
-                    audio_mixed_path,
-                    final_path,
-                    text,
-                    x_pct=request.overlay_x,
-                    y_pct=request.overlay_y,
-                )
-                os.remove(audio_mixed_path)
-            else:
-                os.rename(audio_mixed_path, final_path)
+            os.rename(audio_mixed_path, final_path)
 
         # Step 7: Finalize (100%)
         job.progress = 100

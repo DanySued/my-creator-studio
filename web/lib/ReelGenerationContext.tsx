@@ -19,11 +19,17 @@ export interface JobStatus {
   completed_at: string | null;
 }
 
+export interface TextOverlayItem {
+  text: string;
+  x: number;
+  y: number;
+  font: 'sans' | 'serif' | 'mono';
+  bold: boolean;
+  italic: boolean;
+}
+
 interface OverlayOptions {
-  overlayText?: string;
-  overlayX?: number;
-  overlayY?: number;
-  noText?: boolean;
+  overlays?: TextOverlayItem[];
 }
 
 interface ReelGenerationContextValue {
@@ -126,10 +132,7 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
               duration,
               title: count > 1 ? `${title} ${i + 1}` : title,
               songStartTime,
-              overlayText: overlay.overlayText ?? '',
-              overlayX: overlay.overlayX ?? 50,
-              overlayY: overlay.overlayY ?? 82,
-              noText: overlay.noText ?? false,
+              overlays: overlay.overlays ?? [],
             }),
           })
         );

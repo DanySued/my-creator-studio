@@ -242,52 +242,60 @@ def mix_audio(
         raise VideoProcessingError(f"Mix audio failed: {str(e)}")
 
 
-def burn_text_overlay(
-    input_path: str,
-    output_path: str,
-    text: str,
-    x_pct: float = 50.0,  # 0=left edge, 50=center, 100=right edge
-    y_pct: float = 82.0,  # 0=top edge, 82=near-bottom (viralvibe default), 100=bottom edge
-) -> None:
-    """
-    Burn text overlay onto video at a percentage-based position.
+_FONT_NAME: dict[tuple[str, bool, bool], str] = {
+    ("sans",  False, False): "DejaVu Sans",
+    ("sans",  True,  False): "DejaVu Sans Bold",
+    ("sans",  False, True):  "DejaVu Sans Oblique",
+    ("sans",  True,  True):  "DejaVu Sans Bold Oblique",
+    ("serif", False, False): "DejaVu Serif",
+    ("serif", True,  False): "DejaVu Serif Bold",
+    ("serif", False, True):  "DejaVu Serif Italic",
+    ("serif", True,  True):  "DejaVu Serif Bold Italic",
+    ("mono",  False, False): "DejaVu Sans Mono",
+    ("mono",  True,  False): "DejaVu Sans Mono Bold",
+    ("mono",  False, True):  "DejaVu Sans Mono Oblique",
+    ("mono",  True,  True):  "DejaVu Sans Mono Bold Oblique",
+}
 
-    Args:
-        input_path: Input video
-        output_path: Output video with text
-        text: Text to overlay
-        x_pct: Horizontal position as % of frame width (centers the text block at that point)
-        y_pct: Vertical position as % of frame height (centers the text block at that point)
+
+def _escape(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+
+
+def burn_text_overlays(input_path: str, output_path: str, overlays: list) -> None:
+    """
+    Burn one or more text overlays onto the video using chained FFmpeg drawtext filters.
+    All overlays are applied in a single encode pass.
     """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Escape special characters for ffmpeg drawtext
-    text = text.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+    filters = []
+    for ov in overlays:
+        text = _escape(ov.text.strip())
+        if not text:
+            continue
+        x_expr = f"(w-text_w)*{ov.x / 100:.4f}"
+        y_expr = f"(h-text_h)*{ov.y / 100:.4f}"
+        font = _FONT_NAME.get((ov.font, ov.bold, ov.italic), "DejaVu Sans")
+        filters.append(
+            f"drawtext=text='{text}':fontsize=60:fontcolor=white"
+            f":font='{font}':x={x_expr}:y={y_expr}:shadowx=2:shadowy=2:shadowcolor=black"
+        )
 
-    # Convert percentages to ffmpeg expressions that center the text block at (x_pct%, y_pct%)
-    x_expr = f"(w-text_w)*{x_pct / 100:.4f}"
-    y_expr = f"(h-text_h)*{y_pct / 100:.4f}"
+    if not filters:
+        import shutil
+        shutil.copy2(input_path, output_path)
+        return
 
     cmd = [
-        "ffmpeg",
-        "-i", input_path,
-        "-vf",
-        f"drawtext=text='{text}':fontsize=60:fontcolor=white:x={x_expr}:y={y_expr}:shadowx=2:shadowy=2:shadowcolor=black",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "23",
-        "-c:a", "copy",
-        "-y",
-        output_path,
+        "ffmpeg", "-i", input_path,
+        "-vf", ",".join(filters),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "copy", "-y", output_path,
     ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         if result.returncode != 0:
             raise VideoProcessingError(f"ffmpeg text overlay failed: {result.stderr}")
     except subprocess.TimeoutExpired:

@@ -47,18 +47,25 @@ class CarouselGenerateResponse(BaseModel):
 
 # === Reels Schemas ===
 
+class TextOverlayItem(BaseModel):
+    """A single text layer to burn onto the video."""
+    text: str
+    x: float = 50.0       # % from left (0–100), text centered at this point
+    y: float = 82.0       # % from top  (0–100), text centered at this point
+    font: str = "sans"    # "sans" | "serif" | "mono"
+    bold: bool = False
+    italic: bool = False
+
+
 class ReelGenerateRequest(BaseModel):
     """Request to generate a reel from keywords."""
-    keywords: List[str]       # e.g., ["nature", "sunset", "wildlife"]
-    audio_file_id: str        # ID of uploaded audio track
-    duration: int = 15        # Total reel duration in seconds
+    keywords: List[str]
+    audio_file_id: str
+    duration: int = 15
     title: str = "Generated Reel"
-    song_start_time: int = 0  # Start audio from this many seconds in (skip intro to hit the drop)
-    no_text: bool = False     # Skip text overlay entirely
-    overlay_text: str = ""    # Custom overlay text; falls back to title if blank
-    overlay_x: float = 50.0   # Horizontal text position as % (0=left, 100=right, 50=center)
-    overlay_y: float = 82.0   # Vertical text position as % (0=top, 100=bottom) — viralvibe default
-    count: int = 1            # Number of reel variations to generate in one job
+    song_start_time: int = 0
+    overlays: List[TextOverlayItem] = []  # empty list = no text
+    count: int = 1
 
 
 class ReelJobResponse(BaseModel):

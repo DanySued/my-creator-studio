@@ -14,9 +14,11 @@ import {
   Trash2,
   Play,
   Square,
+  Plus,
+  X,
 } from 'lucide-react';
 import { KeywordEngine } from '@/components/reels/KeywordEngine';
-import { JobStatus, useReelGenerationContext } from '@/lib/ReelGenerationContext';
+import { JobStatus, TextOverlayItem, useReelGenerationContext } from '@/lib/ReelGenerationContext';
 import { triggerDownload } from '@/lib/download';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,17 +73,29 @@ function ProgressBar({ progress, status }: { progress: number; status: JobStatus
   );
 }
 
+interface TextOverlay extends TextOverlayItem {
+  id: string;
+}
+
+const PREVIEW_FONT: Record<string, React.CSSProperties> = {
+  sans:  {},
+  serif: { fontFamily: 'Georgia, serif' },
+  mono:  { fontFamily: 'monospace' },
+};
+
 function TextOverlayPreview({
-  text,
-  position,
+  overlays,
+  selectedId,
+  onSelect,
   onPositionChange,
 }: {
-  text: string;
-  position: { x: number; y: number };
-  onPositionChange: (pos: { x: number; y: number }) => void;
+  overlays: TextOverlay[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onPositionChange: (id: string, pos: { x: number; y: number }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
+  const dragging = useRef<string | null>(null);
 
   const clamp = (v: number) => Math.max(5, Math.min(95, v));
 
@@ -102,18 +116,18 @@ function TextOverlayPreview({
         aspectRatio: '9 / 16',
         background: 'linear-gradient(160deg, #27272a 0%, #18181b 50%, #09090b 100%)',
       }}
-      onMouseMove={(e) => { if (dragging.current) onPositionChange(posFromClient(e.clientX, e.clientY)); }}
-      onMouseUp={() => { dragging.current = false; }}
-      onMouseLeave={() => { dragging.current = false; }}
+      onMouseMove={(e) => {
+        if (dragging.current) onPositionChange(dragging.current, posFromClient(e.clientX, e.clientY));
+      }}
+      onMouseUp={() => { dragging.current = null; }}
+      onMouseLeave={() => { dragging.current = null; }}
     >
       {/* scanlines */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.035]"
-        style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, white 2px, white 3px)',
-        }}
+        style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, white 2px, white 3px)' }}
       />
-      {/* play icon hint */}
+      {/* play icon */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center">
           <div className="w-0 h-0 border-y-[6px] border-y-transparent border-l-[10px] border-l-white/15 ml-1" />
@@ -123,30 +137,40 @@ function TextOverlayPreview({
       <p className="absolute bottom-2 inset-x-0 text-center text-[8px] text-white/25 pointer-events-none">
         drag to reposition
       </p>
-      {/* draggable text pill */}
-      <div
-        className="absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing z-10"
-        style={{ left: `${position.x}%`, top: `${position.y}%` }}
-        onMouseDown={(e) => { e.preventDefault(); dragging.current = true; }}
-        onTouchStart={(e) => { e.preventDefault(); dragging.current = true; }}
-        onTouchMove={(e) => {
-          if (!dragging.current) return;
-          const t = e.touches[0];
-          onPositionChange(posFromClient(t.clientX, t.clientY));
-        }}
-        onTouchEnd={() => { dragging.current = false; }}
-      >
-        <span
-          className={cn(
-            'block px-2 py-0.5 rounded text-[10px] font-bold shadow-lg max-w-[130px] truncate text-center',
-            text
-              ? 'bg-black/60 text-white border border-white/20'
-              : 'bg-black/30 text-white/30 border border-dashed border-white/15 italic'
-          )}
-        >
-          {text || 'Your text here'}
-        </span>
-      </div>
+
+      {overlays.map((ov) => {
+        const display = ov.text || (overlays.length === 1 ? 'Your text here' : '');
+        if (!display) return null;
+        const isSelected = ov.id === selectedId;
+        return (
+          <div
+            key={ov.id}
+            className="absolute -translate-x-1/2 -translate-y-1/2 z-10 cursor-grab active:cursor-grabbing"
+            style={{ left: `${ov.x}%`, top: `${ov.y}%` }}
+            onMouseDown={(e) => { e.preventDefault(); dragging.current = ov.id; onSelect(ov.id); }}
+            onTouchStart={(e) => { e.preventDefault(); dragging.current = ov.id; onSelect(ov.id); }}
+            onTouchMove={(e) => {
+              if (dragging.current !== ov.id) return;
+              const t = e.touches[0];
+              onPositionChange(ov.id, posFromClient(t.clientX, t.clientY));
+            }}
+            onTouchEnd={() => { dragging.current = null; }}
+          >
+            <span
+              className={cn(
+                'block px-2 py-0.5 rounded text-[10px] shadow-lg max-w-[130px] truncate text-center text-white',
+                ov.text ? 'bg-black/60' : 'bg-black/30 opacity-40',
+                isSelected ? 'ring-1 ring-primary' : 'border border-white/15',
+                ov.bold && 'font-bold',
+                ov.italic && 'italic'
+              )}
+              style={PREVIEW_FONT[ov.font] ?? {}}
+            >
+              {display}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -190,9 +214,32 @@ export default function ReelsPage() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [overlayText, setOverlayText] = useState('');
-  const [textPosition, setTextPosition] = useState({ x: 50, y: 82 });
+  const [overlays, setOverlays] = useState<TextOverlay[]>([
+    { id: '1', text: '', x: 50, y: 82, font: 'sans', bold: false, italic: false },
+  ]);
+  const [selectedOverlayId, setSelectedOverlayId] = useState('1');
   const [noText, setNoText] = useState(false);
+  const nextOverlayId = useRef(2);
+
+  const addOverlay = () => {
+    const id = String(nextOverlayId.current++);
+    setOverlays((prev) => [...prev, { id, text: '', x: 50, y: 50, font: 'sans', bold: false, italic: false }]);
+    setSelectedOverlayId(id);
+  };
+
+  const removeOverlay = (id: string) => {
+    setOverlays((prev) => {
+      const next = prev.filter((o) => o.id !== id);
+      if (selectedOverlayId === id) setSelectedOverlayId(next[0]?.id ?? '');
+      return next;
+    });
+  };
+
+  const updateOverlay = (id: string, patch: Partial<TextOverlay>) => {
+    setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+  };
+
+  const selectedOverlay = overlays.find((o) => o.id === selectedOverlayId) ?? null;
 
   const [cleanupState, setCleanupState] = useState<
     { status: 'idle' } | { status: 'loading' } | { status: 'done'; freed_mb: number; dirs_cleaned: number }
@@ -304,6 +351,9 @@ export default function ReelsPage() {
     }
     setValidationError(null);
     setPreviewIndex(0);
+    const activeOverlays = noText
+      ? []
+      : overlays.map(({ text, x, y, font, bold, italic }) => ({ text, x, y, font, bold, italic }));
     await startGeneration(
       isBulk ? reelCount : 1,
       keywords,
@@ -311,7 +361,7 @@ export default function ReelsPage() {
       duration,
       reelTitle,
       effectiveSongStartTime,
-      { overlayText, overlayX: textPosition.x, overlayY: textPosition.y, noText }
+      { overlays: activeOverlays }
     );
   };
 
@@ -558,29 +608,100 @@ export default function ReelsPage() {
             </div>
 
             {!noText ? (
-              <div className="flex gap-5 items-start bg-secondary/50 rounded-xl border border-border p-4">
-                <div className="flex-1 space-y-3 min-w-0">
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-2">Overlay Text</label>
-                    <input
-                      type="text"
-                      value={overlayText}
-                      onChange={(e) => setOverlayText(e.target.value)}
-                      placeholder={`Uses "${reelTitle}" if blank`}
-                      className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Position:{' '}
-                    <span className="text-foreground tabular-nums">
-                      {Math.round(textPosition.x)}% left · {Math.round(textPosition.y)}% top
-                    </span>
-                  </p>
+              <div className="flex gap-4 items-start bg-secondary/50 rounded-xl border border-border p-4">
+                {/* Overlay list */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  {overlays.map((ov) => (
+                    <div
+                      key={ov.id}
+                      onClick={() => setSelectedOverlayId(ov.id)}
+                      className={cn(
+                        'flex items-center gap-1.5 p-2 rounded-xl border cursor-pointer transition-all',
+                        selectedOverlayId === ov.id
+                          ? 'border-primary/40 bg-primary/5'
+                          : 'border-border bg-secondary hover:border-border/80'
+                      )}
+                    >
+                      {/* Font selector */}
+                      <select
+                        value={ov.font}
+                        onChange={(e) => updateOverlay(ov.id, { font: e.target.value as TextOverlay['font'] })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs bg-secondary border border-border rounded-lg px-1.5 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 shrink-0"
+                      >
+                        <option value="sans">Sans</option>
+                        <option value="serif">Serif</option>
+                        <option value="mono">Mono</option>
+                      </select>
+
+                      {/* Bold */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateOverlay(ov.id, { bold: !ov.bold }); }}
+                        className={cn(
+                          'w-6 h-6 rounded text-xs font-bold shrink-0 transition-colors',
+                          ov.bold
+                            ? 'bg-primary/20 text-primary border border-primary/30'
+                            : 'bg-secondary border border-border text-muted-foreground hover:text-foreground'
+                        )}
+                      >B</button>
+
+                      {/* Italic */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateOverlay(ov.id, { italic: !ov.italic }); }}
+                        className={cn(
+                          'w-6 h-6 rounded text-xs italic shrink-0 transition-colors',
+                          ov.italic
+                            ? 'bg-primary/20 text-primary border border-primary/30'
+                            : 'bg-secondary border border-border text-muted-foreground hover:text-foreground'
+                        )}
+                      >I</button>
+
+                      {/* Text input */}
+                      <input
+                        type="text"
+                        value={ov.text}
+                        onChange={(e) => updateOverlay(ov.id, { text: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Add text…"
+                        className="flex-1 min-w-0 px-2 py-1 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      />
+
+                      {/* Remove */}
+                      {overlays.length > 1 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeOverlay(ov.id); }}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-0.5 shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={addOverlay}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add text layer
+                  </button>
+
+                  {selectedOverlay && (
+                    <p className="text-xs text-muted-foreground">
+                      Position:{' '}
+                      <span className="text-foreground tabular-nums">
+                        {Math.round(selectedOverlay.x)}% left · {Math.round(selectedOverlay.y)}% top
+                      </span>
+                    </p>
+                  )}
                 </div>
+
+                {/* Preview */}
                 <TextOverlayPreview
-                  text={overlayText || reelTitle}
-                  position={textPosition}
-                  onPositionChange={setTextPosition}
+                  overlays={overlays}
+                  selectedId={selectedOverlayId}
+                  onSelect={setSelectedOverlayId}
+                  onPositionChange={(id, pos) => updateOverlay(id, pos)}
                 />
               </div>
             ) : (
