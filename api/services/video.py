@@ -92,6 +92,27 @@ def trim_video(
         raise VideoProcessingError(f"Trim failed: {str(e)}")
 
 
+def _get_video_dimensions(filepath: str) -> Tuple[int, int]:
+    """Return (width, height) of the first video stream, rounded down to even numbers."""
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "json",
+            filepath,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    data = json.loads(result.stdout)
+    stream = data.get("streams", [{}])[0]
+    w = int(stream.get("width", 1920))
+    h = int(stream.get("height", 1080))
+    return (w // 2) * 2, (h // 2) * 2
+
+
 def concatenate_videos(
     video_paths: List[str],
     output_path: str,
@@ -109,26 +130,41 @@ def concatenate_videos(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     if len(video_paths) == 1:
-        # Single video, just copy
-        subprocess.run(["cp", video_paths[0], output_path], check=True)
+        import shutil
+        shutil.copy2(video_paths[0], output_path)
         return
 
-    # Create concat demuxer file
-    concat_file = output_path.replace(".mp4", "_concat.txt")
-    with open(concat_file, "w") as f:
-        for video in video_paths:
-            f.write(f"file '{os.path.abspath(video)}'\n")
+    # Probe the first clip to get the normalization target dimensions.
+    # All clips are scaled to these dims before concat so the concat filter
+    # receives identical stream parameters — different resolutions from Pexels
+    # clips is what causes distorted frames with the old concat-demuxer approach.
+    try:
+        target_w, target_h = _get_video_dimensions(video_paths[0])
+    except Exception:
+        target_w, target_h = 1920, 1080
+
+    n = len(video_paths)
+    inputs = [item for p in video_paths for item in ("-i", p)]
+
+    # Per-clip: scale-fill-crop to the target dims and normalize SAR.
+    # Audio is intentionally dropped here — mix_audio replaces it anyway.
+    scale_filters = [
+        f"[{i}:v]scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"crop={target_w}:{target_h},setsar=1,fps=30[v{i}]"
+        for i in range(n)
+    ]
+    concat_in = "".join(f"[v{i}]" for i in range(n))
+    filter_complex = ";".join(scale_filters) + f";{concat_in}concat=n={n}:v=1[vout]"
 
     cmd = [
         "ffmpeg",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", concat_file,
-        "-r", "30",
-        "-c:v", "libx264",  # re-encode so keyframes align at cut points (no glitches)
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", "[vout]",
+        "-an",
+        "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
-        "-c:a", "aac",
         "-y",
         output_path,
     ]
@@ -138,7 +174,7 @@ def concatenate_videos(
             cmd,
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=300,
         )
         if result.returncode != 0:
             raise VideoProcessingError(f"ffmpeg concat failed: {result.stderr}")
@@ -146,10 +182,6 @@ def concatenate_videos(
         raise VideoProcessingError("Video concatenation timeout")
     except Exception as e:
         raise VideoProcessingError(f"Concat failed: {str(e)}")
-    finally:
-        # Clean up concat file
-        if os.path.exists(concat_file):
-            os.remove(concat_file)
 
 
 def scale_to_instagram_reels(
