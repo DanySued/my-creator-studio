@@ -6,13 +6,21 @@ import { TemplateGallery } from '@/components/carousel/TemplateGallery';
 import { CarouselSetup, SetupConfig } from '@/components/carousel/CarouselSetup';
 import { SlideEditor } from '@/components/carousel/SlideEditor';
 import { CarouselExport } from '@/components/carousel/CarouselExport';
-import { ChevronRight } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4;
 
-const STEP_LABELS = ['Template', 'Setup', 'Edit', 'Export'];
+const STEPS = [
+  { n: 1 as Step, label: 'Template', desc: 'Pick a style' },
+  { n: 2 as Step, label: 'Setup', desc: 'Configure content' },
+  { n: 3 as Step, label: 'Edit', desc: 'Fine-tune slides' },
+  { n: 4 as Step, label: 'Export', desc: 'Download your carousel' },
+];
 
-async function buildSlideStates(template: CarouselTemplate, slides: { title: string; content: string }[], carouselTitle: string): Promise<object[]> {
+async function buildSlideStates(
+  template: CarouselTemplate,
+  slides: { title: string; content: string }[],
+  carouselTitle: string,
+): Promise<object[]> {
   const { Canvas, Rect, Textbox, IText, Gradient } = await import('fabric');
 
   const tempEl = document.createElement('canvas');
@@ -22,7 +30,6 @@ async function buildSlideStates(template: CarouselTemplate, slides: { title: str
   for (let i = 0; i < slides.length; i++) {
     c.clear();
 
-    // Background gradient
     const bg = new Rect({
       left: 0, top: 0, width: 540, height: 540,
       fill: new Gradient({
@@ -39,52 +46,26 @@ async function buildSlideStates(template: CarouselTemplate, slides: { title: str
     });
     c.add(bg);
 
-    // Slide number
-    const num = new IText(String(i + 1).padStart(2, '0'), {
-      left: 40, top: 40,
-      fontSize: 20, fontWeight: 'bold',
-      fill: template.accentColor,
-      fontFamily: template.fontFamily,
-    });
-    c.add(num);
-
-    // Total indicator
-    const total = new IText(`/ ${slides.length}`, {
-      left: 74, top: 48,
-      fontSize: 13,
-      fill: template.contentColor,
-      fontFamily: template.fontFamily,
-    });
-    c.add(total);
-
-    // Title
-    const titleText = new Textbox(slides[i].title, {
-      left: 40, top: 110, width: 460,
-      fontSize: 34, fontWeight: 'bold',
-      fill: template.titleColor,
-      fontFamily: template.fontFamily,
-      lineHeight: 1.2,
-    });
-    c.add(titleText);
-
-    // Content
-    const contentText = new Textbox(slides[i].content, {
-      left: 40, top: 260, width: 460,
-      fontSize: 18,
-      fill: template.contentColor,
-      fontFamily: template.fontFamily,
-      lineHeight: 1.6,
-    });
-    c.add(contentText);
-
-    // Branding / title footer
-    const brand = new IText(carouselTitle, {
-      left: 40, top: 490,
-      fontSize: 14,
-      fill: template.accentColor,
-      fontFamily: template.fontFamily,
-    });
-    c.add(brand);
+    c.add(new IText(String(i + 1).padStart(2, '0'), {
+      left: 40, top: 40, fontSize: 20, fontWeight: 'bold',
+      fill: template.accentColor, fontFamily: template.fontFamily,
+    }));
+    c.add(new IText(`/ ${slides.length}`, {
+      left: 74, top: 48, fontSize: 13,
+      fill: template.contentColor, fontFamily: template.fontFamily,
+    }));
+    c.add(new Textbox(slides[i].title, {
+      left: 40, top: 110, width: 460, fontSize: 34, fontWeight: 'bold',
+      fill: template.titleColor, fontFamily: template.fontFamily, lineHeight: 1.2,
+    }));
+    c.add(new Textbox(slides[i].content, {
+      left: 40, top: 260, width: 460, fontSize: 18,
+      fill: template.contentColor, fontFamily: template.fontFamily, lineHeight: 1.6,
+    }));
+    c.add(new IText(carouselTitle, {
+      left: 40, top: 490, fontSize: 14,
+      fill: template.accentColor, fontFamily: template.fontFamily,
+    }));
 
     c.renderAll();
     states.push(c.toJSON());
@@ -92,6 +73,48 @@ async function buildSlideStates(template: CarouselTemplate, slides: { title: str
 
   c.dispose();
   return states;
+}
+
+function StepIndicator({ step, onGoTo }: { step: Step; onGoTo: (s: Step) => void }) {
+  return (
+    <div className="flex-shrink-0 flex items-center justify-center gap-0 px-6 py-0 h-14 border-b border-zinc-800/60 bg-zinc-900/50 backdrop-blur-sm">
+      {STEPS.map((s, i) => {
+        const active = step === s.n;
+        const done = step > s.n;
+        return (
+          <div key={s.n} className="flex items-center">
+            <button
+              onClick={() => done && onGoTo(s.n)}
+              disabled={!done}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs transition-all ${
+                active
+                  ? 'text-white'
+                  : done
+                  ? 'text-zinc-400 hover:text-white cursor-pointer'
+                  : 'text-zinc-600 cursor-default'
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all ${
+                  active
+                    ? 'bg-purple-500 text-white ring-2 ring-purple-500/30'
+                    : done
+                    ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
+                    : 'bg-zinc-800 text-zinc-600'
+                }`}
+              >
+                {done ? '✓' : s.n}
+              </span>
+              <span className={`font-medium ${active ? 'text-white' : ''}`}>{s.label}</span>
+            </button>
+            {i < STEPS.length - 1 && (
+              <div className={`w-8 h-px mx-1 ${step > s.n ? 'bg-emerald-500/40' : 'bg-zinc-800'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function CarouselPage() {
@@ -140,57 +163,24 @@ export default function CarouselPage() {
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
-      {/* Step indicator */}
-      <div className="flex-shrink-0 flex items-center gap-0 px-6 py-3 border-b border-zinc-800 bg-zinc-900">
-        {STEP_LABELS.map((label, i) => {
-          const s = (i + 1) as Step;
-          const active = step === s;
-          const done = step > s;
-          return (
-            <div key={s} className="flex items-center">
-              <button
-                onClick={() => done && setStep(s)}
-                disabled={!done}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                  active ? 'text-white bg-zinc-700' :
-                  done ? 'text-zinc-300 hover:text-white cursor-pointer' :
-                  'text-zinc-600 cursor-default'
-                }`}
-              >
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                  active ? 'bg-purple-500 text-white' :
-                  done ? 'bg-emerald-600 text-white' :
-                  'bg-zinc-700 text-zinc-500'
-                }`}>
-                  {done ? '✓' : s}
-                </span>
-                {label}
-              </button>
-              {i < STEP_LABELS.length - 1 && <ChevronRight size={14} className="text-zinc-700 mx-1" />}
-            </div>
-          );
-        })}
-      </div>
+      <StepIndicator step={step} onGoTo={setStep} />
 
-      {/* Step content */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Step 1 — Template */}
         {step === 1 && (
           <div className="flex-1 overflow-y-auto p-8 flex flex-col">
             <TemplateGallery selected={selectedTemplate} onSelect={setSelectedTemplate} />
-            <div className="flex justify-end mt-6 pt-4 border-t border-zinc-800 flex-shrink-0">
+            <div className="flex justify-end mt-6 pt-4 border-t border-zinc-800/60 flex-shrink-0">
               <button
                 onClick={() => setStep(2)}
                 disabled={!selectedTemplate}
-                className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-colors"
+                className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-purple-900/20"
               >
-                Continue <ChevronRight size={16} />
+                Continue with {selectedTemplate?.name ?? 'template'} →
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2 — Setup */}
         {step === 2 && (
           <div className="flex-1 overflow-y-auto p-8">
             {generateError && (
@@ -202,7 +192,6 @@ export default function CarouselPage() {
           </div>
         )}
 
-        {/* Step 3 — Editor */}
         {step === 3 && slideStates.length > 0 && (
           <div className="flex-1 overflow-hidden relative">
             <SlideEditor
@@ -218,7 +207,6 @@ export default function CarouselPage() {
           </div>
         )}
 
-        {/* Step 4 — Export */}
         {step === 4 && (
           <div className="flex-1 overflow-y-auto p-8">
             <CarouselExport

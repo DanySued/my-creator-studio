@@ -12,6 +12,7 @@ import {
   Sparkles,
   Bot,
   ArrowLeft,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,8 +66,8 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Settings at bottom */}
-      <div className="p-2 border-t border-border">
+      {/* Bottom: settings + logout */}
+      <div className="p-2 border-t border-border space-y-0.5">
         <Link
           href="/settings"
           className={cn(
@@ -79,6 +80,16 @@ export default function Sidebar() {
           <Settings className="w-4 h-4 shrink-0" />
           Settings
         </Link>
+        <button
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            router.push('/login');
+          }}
+          className="flex w-full items-center gap-3 px-3 h-9 rounded-lg transition-all duration-150 text-sm font-medium text-muted-foreground hover:text-red-400 hover:bg-red-500/[0.07]"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          Sign out
+        </button>
       </div>
     </aside>
   );

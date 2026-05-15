@@ -8,7 +8,11 @@ interface Props {
   onSelect: (template: CarouselTemplate) => void;
 }
 
-function TemplateCard({ template, selected, onSelect }: {
+function TemplateCard({
+  template,
+  selected,
+  onSelect,
+}: {
   template: CarouselTemplate;
   selected: boolean;
   onSelect: () => void;
@@ -16,20 +20,27 @@ function TemplateCard({ template, selected, onSelect }: {
   return (
     <button
       onClick={onSelect}
-      className={`group relative rounded-2xl overflow-hidden border-2 transition-all duration-200 text-left focus:outline-none ${
-        selected ? 'border-purple-400 shadow-lg shadow-purple-500/20 scale-[1.02]' : 'border-zinc-700 hover:border-zinc-500'
+      className={`group relative rounded-2xl overflow-hidden text-left focus:outline-none transition-all duration-200 ${
+        selected
+          ? 'ring-2 ring-purple-500 shadow-xl shadow-purple-900/30 scale-[1.02]'
+          : 'ring-1 ring-zinc-800 hover:ring-zinc-600 hover:shadow-lg hover:shadow-black/30 hover:scale-[1.01]'
       }`}
     >
-      {/* Mini slide preview */}
+      {/* Slide preview */}
       <div
-        className="aspect-square w-full flex flex-col justify-between p-4"
+        className="aspect-square w-full flex flex-col justify-between p-5 relative overflow-hidden"
         style={{
           background: `linear-gradient(135deg, ${template.gradientFrom}, ${template.gradientTo})`,
           fontFamily: template.fontFamily,
         }}
       >
+        {/* Shine overlay on hover */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+
         {/* Slide number */}
-        <span className="text-xs font-bold" style={{ color: template.accentColor }}>01</span>
+        <span className="text-xs font-bold" style={{ color: template.accentColor }}>
+          01
+        </span>
 
         {/* Content preview */}
         <div className="space-y-2">
@@ -40,30 +51,34 @@ function TemplateCard({ template, selected, onSelect }: {
             Your Title Here
           </div>
           <div
-            className="text-xs leading-snug opacity-80 line-clamp-3"
+            className="text-[11px] leading-snug opacity-75 line-clamp-3"
             style={{ color: template.contentColor }}
           >
             Your content will appear here after Gemini processes your document.
           </div>
         </div>
 
-        {/* Branding footer */}
+        {/* Footer */}
         <div className="text-[10px] font-semibold" style={{ color: template.accentColor }}>
           ● Creator Studio
         </div>
       </div>
 
-      {/* Template name */}
-      <div className="bg-zinc-900 px-3 py-2 flex items-center justify-between">
+      {/* Name row */}
+      <div className="bg-zinc-900 px-4 py-3 flex items-center justify-between border-t border-zinc-800">
         <div>
           <p className="text-sm font-semibold text-white">{template.name}</p>
-          <p className="text-xs text-zinc-400">{template.description}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">{template.description}</p>
         </div>
-        {selected && (
-          <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
-            <Check size={12} className="text-white" />
-          </div>
-        )}
+        <div
+          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${
+            selected
+              ? 'bg-purple-500 scale-100'
+              : 'bg-zinc-800 scale-75 opacity-0 group-hover:opacity-40 group-hover:scale-90'
+          }`}
+        >
+          <Check size={11} className="text-white" />
+        </div>
       </div>
     </button>
   );
@@ -73,11 +88,13 @@ export function TemplateGallery({ selected, onSelect }: Props) {
   return (
     <div className="flex flex-col h-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-1">Choose a Template</h2>
-        <p className="text-zinc-400 text-sm">Pick a style for your Instagram carousel. You can customize everything later.</p>
+        <h2 className="text-xl font-bold text-white mb-1">Choose a Template</h2>
+        <p className="text-zinc-500 text-sm">
+          Pick a visual style. You can customise fonts, colours, and text in the editor.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1 overflow-y-auto pb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1 pb-4">
         {CAROUSEL_TEMPLATES.map((t) => (
           <TemplateCard
             key={t.id}

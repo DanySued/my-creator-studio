@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { UploadZone } from './UploadZone';
 import { extractText } from '@/lib/textExtraction';
-import { Loader, FileText, X } from 'lucide-react';
+import { Loader2, FileText, X, Sparkles } from 'lucide-react';
 
 const TONES = [
   { id: 'professional', label: 'Professional', desc: 'Formal & structured' },
@@ -13,7 +13,7 @@ const TONES = [
   { id: 'bold', label: 'Bold', desc: 'Punchy & high-impact' },
 ] as const;
 
-export type Tone = typeof TONES[number]['id'];
+export type Tone = (typeof TONES)[number]['id'];
 
 export interface SetupConfig {
   content: string;
@@ -61,31 +61,40 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto w-full">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-1">Set Up Your Carousel</h2>
-        <p className="text-zinc-400 text-sm">Upload your content, choose a tone, and set how many slides you want.</p>
+    <div className="max-w-2xl mx-auto w-full">
+      <div className="mb-7">
+        <h2 className="text-xl font-bold text-white mb-1">Set Up Your Carousel</h2>
+        <p className="text-zinc-500 text-sm">
+          Upload your content, pick a tone, and Gemini will generate your slides.
+        </p>
       </div>
 
-      <div className="flex flex-col gap-6 flex-1 overflow-y-auto pb-4">
+      <div className="flex flex-col gap-7">
         {/* File upload */}
         <div>
-          <label className="block text-sm font-semibold text-zinc-300 mb-2">Content File</label>
+          <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wide">
+            Content File
+          </label>
           {file ? (
-            <div className="flex items-center gap-3 px-4 py-3 bg-zinc-800 border border-zinc-600 rounded-xl">
-              <FileText size={18} className="text-purple-400 flex-shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-3 bg-zinc-800/60 border border-zinc-700 rounded-xl">
+              <FileText size={17} className="text-purple-400 shrink-0" />
               <span className="text-sm text-white flex-1 truncate">{file.name}</span>
-              <span className="text-xs text-zinc-400">{content.length.toLocaleString()} chars</span>
-              <button onClick={() => { setFile(null); setContent(''); }} className="text-zinc-500 hover:text-white">
-                <X size={16} />
+              <span className="text-xs text-zinc-500 shrink-0">
+                {content.length.toLocaleString()} chars
+              </span>
+              <button
+                onClick={() => { setFile(null); setContent(''); }}
+                className="text-zinc-600 hover:text-zinc-300 transition-colors ml-1"
+              >
+                <X size={15} />
               </button>
             </div>
           ) : (
-            <div className="h-40">
+            <div className="h-36">
               {extracting ? (
-                <div className="h-full flex items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl">
-                  <Loader size={20} className="animate-spin text-purple-400 mr-2" />
-                  <span className="text-zinc-400 text-sm">Extracting text…</span>
+                <div className="h-full flex items-center justify-center border border-dashed border-zinc-700 rounded-xl bg-zinc-900/40">
+                  <Loader2 size={18} className="animate-spin text-purple-400 mr-2" />
+                  <span className="text-zinc-500 text-sm">Extracting text…</span>
                 </div>
               ) : (
                 <UploadZone onFileUpload={handleFile} />
@@ -94,34 +103,41 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
           )}
         </div>
 
+        {/* Divider */}
+        <div className="h-px bg-zinc-800/60" />
+
         {/* Title */}
         <div>
-          <label className="block text-sm font-semibold text-zinc-300 mb-2">Carousel Title</label>
+          <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wide">
+            Carousel Title
+          </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="My Carousel"
-            className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-600 rounded-xl text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:border-purple-500"
+            className="w-full px-4 py-2.5 bg-zinc-800/60 border border-zinc-700 rounded-xl text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-colors"
           />
         </div>
 
         {/* Tone */}
         <div>
-          <label className="block text-sm font-semibold text-zinc-300 mb-2">Tone</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wide">
+            Tone
+          </label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {TONES.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTone(t.id)}
                 className={`px-3 py-2.5 rounded-xl text-left border transition-all ${
                   tone === t.id
-                    ? 'border-purple-400 bg-purple-500/10 text-white'
-                    : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                    ? 'border-purple-500/60 bg-purple-500/10 text-white shadow-sm shadow-purple-900/20'
+                    : 'border-zinc-700/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300'
                 }`}
               >
                 <p className="text-sm font-semibold">{t.label}</p>
-                <p className="text-xs opacity-70 mt-0.5">{t.desc}</p>
+                <p className="text-[11px] opacity-60 mt-0.5 leading-snug">{t.desc}</p>
               </button>
             ))}
           </div>
@@ -129,8 +145,9 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
 
         {/* Slide count */}
         <div>
-          <label className="block text-sm font-semibold text-zinc-300 mb-2">
-            Number of Slides <span className="text-purple-400 font-bold ml-1">{slideCount}</span>
+          <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wide">
+            Slides{' '}
+            <span className="text-purple-400 font-bold normal-case ml-1">{slideCount}</span>
           </label>
           <input
             type="range"
@@ -138,10 +155,11 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
             max={15}
             value={slideCount}
             onChange={(e) => setSlideCount(Number(e.target.value))}
-            className="w-full accent-purple-500"
+            className="w-full accent-purple-500 h-1.5"
           />
-          <div className="flex justify-between text-xs text-zinc-500 mt-1">
-            <span>3</span><span>15</span>
+          <div className="flex justify-between text-xs text-zinc-600 mt-1.5">
+            <span>3 slides</span>
+            <span>15 slides</span>
           </div>
         </div>
 
@@ -154,9 +172,13 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
         <button
           onClick={handleGenerate}
           disabled={isGenerating || !content}
-          className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+          className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-purple-900/20"
         >
-          {isGenerating && <Loader size={16} className="animate-spin" />}
+          {isGenerating ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Sparkles size={16} />
+          )}
           {isGenerating ? 'Generating with Gemini…' : 'Generate Slides'}
         </button>
       </div>
