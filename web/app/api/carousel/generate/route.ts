@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
         slide_count: body.slideCount || 5,
         theme: body.theme || 'midnight',
         title: body.title || 'Generated Carousel',
+        tone: body.tone || 'professional',
       }),
     });
 

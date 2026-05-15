@@ -1,251 +1,234 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { toPng } from 'html-to-image';
-import JSZip from 'jszip';
-import { UploadZone } from '@/components/carousel/UploadZone';
-import { ConfigPanel } from '@/components/carousel/ConfigPanel';
-import { SlidePreview } from '@/components/carousel/SlidePreview';
-import { SlideStrip } from '@/components/carousel/SlideStrip';
-import { extractText } from '@/lib/textExtraction';
-import { triggerDownload } from '@/lib/download';
-import { Loader } from 'lucide-react';
+import { useState } from 'react';
+import { CarouselTemplate } from '@/lib/carouselTemplates';
+import { TemplateGallery } from '@/components/carousel/TemplateGallery';
+import { CarouselSetup, SetupConfig } from '@/components/carousel/CarouselSetup';
+import { SlideEditor } from '@/components/carousel/SlideEditor';
+import { CarouselExport } from '@/components/carousel/CarouselExport';
+import { ChevronRight } from 'lucide-react';
 
-interface Slide {
-  id: number;
-  title: string;
-  content: string;
+type Step = 1 | 2 | 3 | 4;
+
+const STEP_LABELS = ['Template', 'Setup', 'Edit', 'Export'];
+
+async function buildSlideStates(template: CarouselTemplate, slides: { title: string; content: string }[], carouselTitle: string): Promise<object[]> {
+  const { Canvas, Rect, Textbox, IText, Gradient } = await import('fabric');
+
+  const tempEl = document.createElement('canvas');
+  const c = new Canvas(tempEl, { width: 540, height: 540, renderOnAddRemove: false });
+  const states: object[] = [];
+
+  for (let i = 0; i < slides.length; i++) {
+    c.clear();
+
+    // Background gradient
+    const bg = new Rect({
+      left: 0, top: 0, width: 540, height: 540,
+      fill: new Gradient({
+        type: 'linear',
+        gradientUnits: 'pixels',
+        coords: { x1: 0, y1: 0, x2: 540, y2: 540 },
+        colorStops: [
+          { offset: 0, color: template.gradientFrom },
+          { offset: 1, color: template.gradientTo },
+        ],
+      }),
+      selectable: false, evented: false,
+      data: { role: 'bg' },
+    });
+    c.add(bg);
+
+    // Slide number
+    const num = new IText(String(i + 1).padStart(2, '0'), {
+      left: 40, top: 40,
+      fontSize: 20, fontWeight: 'bold',
+      fill: template.accentColor,
+      fontFamily: template.fontFamily,
+    });
+    c.add(num);
+
+    // Total indicator
+    const total = new IText(`/ ${slides.length}`, {
+      left: 74, top: 48,
+      fontSize: 13,
+      fill: template.contentColor,
+      fontFamily: template.fontFamily,
+    });
+    c.add(total);
+
+    // Title
+    const titleText = new Textbox(slides[i].title, {
+      left: 40, top: 110, width: 460,
+      fontSize: 34, fontWeight: 'bold',
+      fill: template.titleColor,
+      fontFamily: template.fontFamily,
+      lineHeight: 1.2,
+    });
+    c.add(titleText);
+
+    // Content
+    const contentText = new Textbox(slides[i].content, {
+      left: 40, top: 260, width: 460,
+      fontSize: 18,
+      fill: template.contentColor,
+      fontFamily: template.fontFamily,
+      lineHeight: 1.6,
+    });
+    c.add(contentText);
+
+    // Branding / title footer
+    const brand = new IText(carouselTitle, {
+      left: 40, top: 490,
+      fontSize: 14,
+      fill: template.accentColor,
+      fontFamily: template.fontFamily,
+    });
+    c.add(brand);
+
+    c.renderAll();
+    states.push(c.toJSON());
+  }
+
+  c.dispose();
+  return states;
 }
 
 export default function CarouselPage() {
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [content, setContent] = useState('');
-  const [theme, setTheme] = useState('midnight');
-  const [title, setTitle] = useState('Generated Carousel');
-  const [directory, setDirectory] = useState('downloads');
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [step, setStep] = useState<Step>(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<CarouselTemplate | null>(null);
+  const [setupConfig, setSetupConfig] = useState<SetupConfig | null>(null);
+  const [slideStates, setSlideStates] = useState<object[]>([]);
+  const [exportDataUrls, setExportDataUrls] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const slideRef = useRef<HTMLDivElement | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
-  const handleFileUpload = async (file: File) => {
-    setError(null);
-    setUploadedFile(file);
-
-    try {
-      const extractedText = await extractText(file);
-      if (extractedText.length < 10) {
-        throw new Error('File contains too little text');
-      }
-      setContent(extractedText);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to extract text';
-      setError(`Extraction error: ${errorMsg}`);
-      setUploadedFile(null);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!content) {
-      setError('No content to generate from');
-      return;
-    }
-
-    setError(null);
+  const handleGenerate = async (config: SetupConfig) => {
+    setGenerateError(null);
     setIsGenerating(true);
-
     try {
-      const response = await fetch('/api/carousel/generate', {
+      const res = await fetch('/api/carousel/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content,
-          slideCount: 5,
-          theme,
-          title,
+          content: config.content,
+          slideCount: config.slideCount,
+          tone: config.tone,
+          title: config.title,
+          theme: selectedTemplate?.id ?? 'midnight',
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Generation failed');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Generation failed');
       }
 
-      const data = await response.json();
-      const formattedSlides: Slide[] = data.slides.map(
-        (slide: { title: string; content: string }, index: number) => ({
-          id: index,
-          title: slide.title,
-          content: slide.content,
-        })
-      );
+      const data = await res.json();
+      const slides: { title: string; content: string }[] = data.slides;
 
-      setSlides(formattedSlides);
-      setCurrentSlide(0);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Generation failed';
-      setError(errorMsg);
+      setSetupConfig(config);
+      const states = await buildSlideStates(selectedTemplate!, slides, config.title);
+      setSlideStates(states);
+      setStep(3);
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Generation failed');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleExport = async () => {
-    if (slides.length === 0) {
-      setError('No slides to export');
-      return;
-    }
-    if (!slideRef.current) {
-      setError('Slide preview not available');
-      return;
-    }
-
-    setError(null);
-    setIsExporting(true);
-
-    try {
-      const zip = new JSZip();
-      const savedSlide = currentSlide;
-
-      for (let i = 0; i < slides.length; i++) {
-        setCurrentSlide(i);
-        // Wait two frames: one for React state flush, one for paint
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-        if (!slideRef.current) throw new Error('Lost reference to slide preview');
-
-        const dataUrl = await toPng(slideRef.current, { pixelRatio: 2 });
-        const base64 = dataUrl.split(',')[1];
-        zip.file(`slide_${String(i + 1).padStart(2, '0')}.png`, base64, { base64: true });
-      }
-
-      setCurrentSlide(savedSlide);
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      triggerDownload(window.URL.createObjectURL(blob), `${title.replace(/\s+/g, '_')}_slides.zip`, true);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Export failed';
-      setError(errorMsg);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
-    <div className="flex h-full bg-background">
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Section - Upload or Preview */}
-        <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
-          {!uploadedFile ? (
-            <div className="w-full max-w-3xl h-96">
-              <UploadZone onFileUpload={handleFileUpload} />
-            </div>
-          ) : slides.length === 0 ? (
-            <div className="text-center">
-              <p className="text-muted-foreground mb-4">
-                ✓ File uploaded:{' '}
-                <span className="text-foreground font-mono">{uploadedFile.name}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {content.length} characters extracted
-              </p>
-              {error && (
-                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-                  {error}
-                </div>
-              )}
-            </div>
-          ) : (
-            <SlidePreview
-              currentSlide={currentSlide}
-              totalSlides={slides.length}
-              theme={theme}
-              content={slides[currentSlide]?.content || ''}
-              title={slides[currentSlide]?.title || ''}
-              onPrevious={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-              onNext={() =>
-                setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))
-              }
-              containerRef={slideRef}
-            />
-          )}
-        </div>
-
-        {/* Slides Strip */}
-        {slides.length > 0 && (
-          <div className="px-8 pb-6">
-            <SlideStrip
-              slides={slides}
-              currentSlide={currentSlide}
-              onSlideSelect={setCurrentSlide}
-              theme={theme}
-            />
-          </div>
-        )}
-
-        {/* Error Messages */}
-        {error && slides.length === 0 && (
-          <div className="px-8 pb-4">
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
-              {error}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="px-8 pb-6 flex gap-3">
-          {!uploadedFile ? (
-            <button
-              onClick={() => setUploadedFile(null)}
-              className="px-6 py-2 bg-secondary border border-border text-muted-foreground rounded-xl text-sm font-medium cursor-not-allowed opacity-50"
-              disabled
-            >
-              Clear
-            </button>
-          ) : (
-            <>
+    <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
+      {/* Step indicator */}
+      <div className="flex-shrink-0 flex items-center gap-0 px-6 py-3 border-b border-zinc-800 bg-zinc-900">
+        {STEP_LABELS.map((label, i) => {
+          const s = (i + 1) as Step;
+          const active = step === s;
+          const done = step > s;
+          return (
+            <div key={s} className="flex items-center">
               <button
-                onClick={() => {
-                  setUploadedFile(null);
-                  setContent('');
-                  setSlides([]);
-                  setError(null);
-                }}
-                className="px-6 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground rounded-xl text-sm font-medium transition-colors"
+                onClick={() => done && setStep(s)}
+                disabled={!done}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                  active ? 'text-white bg-zinc-700' :
+                  done ? 'text-zinc-300 hover:text-white cursor-pointer' :
+                  'text-zinc-600 cursor-default'
+                }`}
               >
-                Clear
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  active ? 'bg-purple-500 text-white' :
+                  done ? 'bg-emerald-600 text-white' :
+                  'bg-zinc-700 text-zinc-500'
+                }`}>
+                  {done ? '✓' : s}
+                </span>
+                {label}
               </button>
-              {slides.length > 0 && (
-                <button
-                  onClick={handleExport}
-                  disabled={isExporting}
-                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-                >
-                  {isExporting && <Loader className="w-4 h-4 animate-spin" />}
-                  {isExporting ? 'Exporting…' : 'Export as ZIP'}
-                </button>
-              )}
-            </>
-          )}
-        </div>
+              {i < STEP_LABELS.length - 1 && <ChevronRight size={14} className="text-zinc-700 mx-1" />}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Config Panel */}
-      <ConfigPanel
-        content={content}
-        onContentChange={setContent}
-        theme={theme}
-        onThemeChange={setTheme}
-        title={title}
-        onTitleChange={setTitle}
-        directory={directory}
-        onDirectoryChange={setDirectory}
-        onGenerate={handleGenerate}
-        isGenerating={isGenerating}
-      />
+      {/* Step content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Step 1 — Template */}
+        {step === 1 && (
+          <div className="flex-1 overflow-y-auto p-8 flex flex-col">
+            <TemplateGallery selected={selectedTemplate} onSelect={setSelectedTemplate} />
+            <div className="flex justify-end mt-6 pt-4 border-t border-zinc-800 flex-shrink-0">
+              <button
+                onClick={() => setStep(2)}
+                disabled={!selectedTemplate}
+                className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-colors"
+              >
+                Continue <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2 — Setup */}
+        {step === 2 && (
+          <div className="flex-1 overflow-y-auto p-8">
+            {generateError && (
+              <div className="max-w-2xl mx-auto mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+                {generateError}
+              </div>
+            )}
+            <CarouselSetup onGenerate={handleGenerate} isGenerating={isGenerating} />
+          </div>
+        )}
+
+        {/* Step 3 — Editor */}
+        {step === 3 && slideStates.length > 0 && (
+          <div className="flex-1 overflow-hidden relative">
+            <SlideEditor
+              template={selectedTemplate!}
+              slideStates={slideStates}
+              carouselTitle={setupConfig?.title ?? 'My Carousel'}
+              onSlideStatesChange={setSlideStates}
+              onExportReady={(urls) => {
+                setExportDataUrls(urls);
+                setStep(4);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Step 4 — Export */}
+        {step === 4 && (
+          <div className="flex-1 overflow-y-auto p-8">
+            <CarouselExport
+              exportDataUrls={exportDataUrls}
+              title={setupConfig?.title ?? 'carousel'}
+              onBack={() => setStep(3)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

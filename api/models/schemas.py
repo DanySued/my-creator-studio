@@ -16,6 +16,18 @@ class CarouselGenerateRequest(BaseModel):
     slide_count: int = 5  # Number of slides to generate
     theme: str = "midnight"
     title: str = "Generated Carousel"
+    tone: str = "professional"
+
+
+class PexelsPhotoItem(BaseModel):
+    id: int
+    thumb: str
+    full: str
+    photographer: str
+
+
+class PexelsPhotoSearchResponse(BaseModel):
+    photos: List[PexelsPhotoItem]
 
 
 class CarouselExportRequest(BaseModel):

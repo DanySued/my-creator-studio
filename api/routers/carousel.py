@@ -5,7 +5,7 @@ import json
 from io import BytesIO
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 import zipfile
 
@@ -15,10 +15,12 @@ from models.schemas import (
     CarouselGenerateResponse,
     CarouselHistoryResponse,
     CarouselResponse,
+    PexelsPhotoSearchResponse,
     SlideData,
 )
 from models.database import Carousel, CarouselSlide
 from services.gemini import generate_carousel_slides
+from services.pexels import search_photos
 
 router = APIRouter()
 
@@ -52,6 +54,7 @@ async def generate_carousel(request: CarouselGenerateRequest):
             content=request.content,
             slide_count=request.slide_count,
             title=request.title,
+            tone=request.tone,
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
@@ -143,6 +146,18 @@ async def export_carousel(request: CarouselExportRequest):
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.zip"'},
     )
+
+
+@router.get("/pexels-backgrounds", response_model=PexelsPhotoSearchResponse)
+async def pexels_background_search(q: str = Query(..., min_length=1, description="Search query")):
+    """Search Pexels for square photos to use as slide backgrounds."""
+    try:
+        photos = await search_photos(query=q, per_page=20)
+        return PexelsPhotoSearchResponse(photos=photos)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pexels search failed: {str(e)[:200]}")
 
 
 @router.get("/history", response_model=CarouselHistoryResponse)

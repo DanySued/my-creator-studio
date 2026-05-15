@@ -76,6 +76,36 @@ async def search_videos(keywords: List[str], per_page: int = 10) -> List[dict]:
     return video_list
 
 
+async def search_photos(query: str, per_page: int = 20) -> list:
+    """Search Pexels for photos to use as slide backgrounds."""
+    api_key = os.getenv("PEXELS_API_KEY")
+    if not api_key:
+        raise ValueError("PEXELS_API_KEY not set")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get(
+            "https://api.pexels.com/v1/search",
+            headers={"Authorization": api_key},
+            params={"query": query, "per_page": per_page, "orientation": "square"},
+        )
+        if response.status_code == 401:
+            raise ValueError("Pexels API key is invalid")
+        if response.status_code == 429:
+            raise ValueError("Pexels rate limit exceeded")
+        if not response.is_success:
+            raise ValueError(f"Pexels error: {response.text[:200]}")
+
+        return [
+            {
+                "id": p["id"],
+                "thumb": p["src"]["medium"],
+                "full": p["src"]["large2x"],
+                "photographer": p["photographer"],
+            }
+            for p in response.json().get("photos", [])
+        ]
+
+
 async def download_video(url: str, filepath: str) -> None:
     """
     Download a video from Pexels URL to local file.

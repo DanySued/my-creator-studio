@@ -14,10 +14,20 @@ def initialize_gemini():
     genai.configure(api_key=api_key)
 
 
+TONE_INSTRUCTIONS = {
+    "professional": "Use formal, structured language. Lead with facts and clear insights.",
+    "casual": "Use friendly, conversational language. Keep it approachable and relatable.",
+    "inspirational": "Use motivational, emotionally resonant language. Tell a story and inspire action.",
+    "educational": "Use clear, explanatory language. Break down complex ideas step by step.",
+    "bold": "Use short, punchy sentences. Maximum impact. Be direct and assertive.",
+}
+
+
 def generate_carousel_slides(
     content: str,
     slide_count: int = 5,
-    title: str = "Generated Carousel"
+    title: str = "Generated Carousel",
+    tone: str = "professional",
 ) -> List[SlideData]:
     """
     Generate carousel slides from document content using Gemini API.
@@ -35,8 +45,12 @@ def generate_carousel_slides(
     except ValueError as e:
         raise ValueError(f"Gemini not configured: {e}")
 
+    tone_instruction = TONE_INSTRUCTIONS.get(tone, TONE_INSTRUCTIONS["professional"])
+
     # Create the prompt for Gemini
-    prompt = f"""You are an expert content strategist. Convert the following document content into exactly {slide_count} carousel slides.
+    prompt = f"""You are an expert content strategist. Convert the following document content into exactly {slide_count} Instagram carousel slides.
+
+Tone: {tone_instruction}
 
 Document content:
 ---
@@ -55,6 +69,7 @@ Return a JSON array with this exact structure:
 ]
 
 Requirements:
+- Apply the tone consistently across all slides
 - Make content visually scannable
 - Use active voice
 - Include key points from the document
