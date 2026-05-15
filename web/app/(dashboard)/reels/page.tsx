@@ -205,6 +205,7 @@ export default function ReelsPage() {
   const [reelCount, setReelCount] = useState(3);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingAudioId, setDeletingAudioId] = useState<string | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -370,6 +371,24 @@ export default function ReelsPage() {
     }
   };
 
+  const handleDeleteAudio = async (audioId: string) => {
+    setDeletingAudioId(audioId);
+    setAudioError(null);
+    try {
+      const res = await fetch(`/api/reels/audio/${audioId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete audio');
+      }
+      setAudioFiles((prev) => prev.filter((a) => a.id !== audioId));
+      if (selectedAudioId === audioId) setSelectedAudioId('');
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : 'Failed to delete audio');
+    } finally {
+      setDeletingAudioId(null);
+    }
+  };
+
   const handleGenerate = async () => {
     if (keywords.length === 0) {
       setValidationError('Please add at least one keyword');
@@ -458,6 +477,17 @@ export default function ReelsPage() {
                       <div className="text-sm font-medium text-foreground truncate">{audio.filename}</div>
                       <div className="text-xs text-muted-foreground">{audio.duration}s</div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); handleDeleteAudio(audio.id); }}
+                      disabled={deletingAudioId === audio.id}
+                      className="ml-2 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 shrink-0"
+                      aria-label={`Delete ${audio.filename}`}
+                    >
+                      {deletingAudioId === audio.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
                   </label>
                 ))}
               </div>

@@ -163,6 +163,23 @@ async def stream_audio(audio_id: str):
     return FileResponse(path=audio.file_path, filename=audio.filename)
 
 
+@router.delete("/audio/{audio_id}", status_code=204)
+async def delete_audio(audio_id: str):
+    """Delete an uploaded audio file from storage and the database."""
+    try:
+        audio = AudioFile.get_by_id(audio_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    if os.path.exists(audio.file_path):
+        try:
+            os.remove(audio.file_path)
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
+
+    audio.delete_instance()
+
+
 @router.get("/list", response_model=ReelListResponse)
 async def list_reels():
     """
