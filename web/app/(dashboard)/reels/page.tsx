@@ -10,11 +10,14 @@ import {
   Layers,
   CheckCircle,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { KeywordEngine } from '@/components/reels/KeywordEngine';
 import { JobStatus, useReelGenerationContext } from '@/lib/ReelGenerationContext';
 import { triggerDownload } from '@/lib/download';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface AudioFile {
   id: string;
@@ -30,10 +33,10 @@ function StatusLabel({ status }: { status: JobStatus['status'] }) {
     failed: 'Failed',
   };
   const colors: Record<JobStatus['status'], string> = {
-    queued: 'text-gray-400',
+    queued: 'text-muted-foreground',
     processing: 'text-blue-400',
-    done: 'text-green-400',
-    failed: 'text-red-400',
+    done: 'text-emerald-400',
+    failed: 'text-destructive',
   };
   return <span className={`text-xs font-medium ${colors[status]}`}>{labels[status]}</span>;
 }
@@ -44,12 +47,12 @@ function ProgressBar({ progress, status }: { progress: number; status: JobStatus
   const barColor = isFailed
     ? 'from-red-500 to-red-600'
     : isDone
-      ? 'from-green-500 to-emerald-500'
+      ? 'from-emerald-500 to-green-500'
       : 'from-blue-500 to-purple-500';
   const width = isDone || isFailed ? 100 : Math.max(progress, 4);
 
   return (
-    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
       <div
         className={`h-full bg-gradient-to-r ${barColor} relative overflow-hidden transition-all duration-700`}
         style={{ width: `${width}%` }}
@@ -68,9 +71,9 @@ function ProgressBar({ progress, status }: { progress: number; status: JobStatus
 function VideoPreview({ reelId, label }: { reelId: string; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 w-full">
-      {label && <p className="text-sm font-medium text-gray-300">{label}</p>}
+      {label && <p className="text-sm font-medium text-foreground">{label}</p>}
       <div
-        className="rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl"
+        className="rounded-xl overflow-hidden bg-black border border-border shadow-2xl"
         style={{ width: '100%', maxWidth: '280px', aspectRatio: '9 / 16' }}
       >
         <video
@@ -98,7 +101,6 @@ export default function ReelsPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
 
-  // survives navigation
   const { jobs, isGenerating, error, startGeneration, reset } = useReelGenerationContext();
 
   const isActive = jobs.length > 0 || isGenerating;
@@ -175,37 +177,37 @@ export default function ReelsPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Reels Generator</h1>
-        <p className="text-gray-400">Enter keywords, pick audio, and generate Instagram-ready reels.</p>
-      </div>
-
       {!isActive && (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-3">1. Keywords</h2>
+          {/* Keywords */}
+          <section>
+            <h2 className="text-sm font-semibold text-foreground mb-3">1. Keywords</h2>
             <KeywordEngine keywords={keywords} onKeywordsChange={setKeywords} />
-          </div>
+          </section>
 
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-3">2. Audio Track</h2>
+          {/* Audio */}
+          <section>
+            <h2 className="text-sm font-semibold text-foreground mb-3">2. Audio Track</h2>
 
             {audioError && <ErrorBanner message={audioError} className="mb-3" />}
 
             {isLoadingAudio ? (
-              <div className="flex items-center justify-center p-8 bg-white/5 rounded-lg border border-white/10">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-[54px] w-full rounded-xl" />
+                ))}
               </div>
             ) : audioFiles.length > 0 ? (
-              <div className="grid grid-cols-1 gap-2">
+              <div className="space-y-2">
                 {audioFiles.map((audio) => (
                   <label
                     key={audio.id}
-                    className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${
+                    className={cn(
+                      'flex items-center p-3.5 rounded-xl border cursor-pointer transition-all',
                       selectedAudioId === audio.id
-                        ? 'bg-blue-500/20 border-blue-500'
-                        : 'bg-white/5 border-white/10 hover:border-white/20'
-                    }`}
+                        ? 'bg-primary/10 border-primary/40'
+                        : 'bg-secondary/50 border-border hover:border-border/80 hover:bg-secondary'
+                    )}
                   >
                     <input
                       type="radio"
@@ -213,24 +215,29 @@ export default function ReelsPage() {
                       value={audio.id}
                       checked={selectedAudioId === audio.id}
                       onChange={(e) => setSelectedAudioId(e.target.value)}
-                      className="mr-3"
+                      className="mr-3 accent-primary"
                     />
-                    <Music className="w-4 h-4 mr-2 text-gray-400" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-white">{audio.filename}</div>
-                      <div className="text-xs text-gray-500">{audio.duration}s</div>
+                    <Music className={cn('w-4 h-4 mr-2.5', selectedAudioId === audio.id ? 'text-primary' : 'text-muted-foreground')} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-foreground truncate">{audio.filename}</div>
+                      <div className="text-xs text-muted-foreground">{audio.duration}s</div>
                     </div>
                   </label>
                 ))}
               </div>
             ) : (
-              <div className="text-center p-6 bg-white/5 rounded-lg border border-white/10">
-                <p className="text-gray-400 mb-3">No audio files uploaded yet</p>
+              <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-border bg-secondary/30 text-center">
+                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center mb-3">
+                  <Music className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1">No audio tracks yet</p>
+                <p className="text-xs text-muted-foreground mb-4">Upload an MP3, WAV, or M4A file to get started</p>
               </div>
             )}
 
             <div className="mt-3">
-              <label className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer text-sm font-medium transition-colors">
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground rounded-xl cursor-pointer text-sm font-medium transition-colors">
+                <Upload className="w-3.5 h-3.5" />
                 Upload Audio
                 <input
                   type="file"
@@ -241,71 +248,77 @@ export default function ReelsPage() {
                 />
               </label>
             </div>
-          </div>
+          </section>
 
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-3">3. Settings</h2>
-            <div className="space-y-4 bg-white/5 rounded-xl border border-white/10 p-5">
+          {/* Settings */}
+          <section>
+            <h2 className="text-sm font-semibold text-foreground mb-3">3. Settings</h2>
+            <div className="space-y-4 bg-secondary/50 rounded-xl border border-border p-5">
               <div>
-                <label className="block text-sm text-gray-300 mb-2">Reel Title</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">Reel Title</label>
                 <input
                   type="text"
                   value={reelTitle}
                   onChange={(e) => setReelTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-2">Duration: {duration}s</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-2">
+                  Duration: <span className="text-foreground font-semibold">{duration}s</span>
+                </label>
                 <input
                   type="range"
                   min="3"
                   max="60"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full"
+                  className="w-full accent-primary"
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <div className="flex items-center justify-between pt-3 border-t border-border">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm font-medium text-white">Bulk Creation</span>
+                    <Layers className="w-4 h-4 text-violet-400" />
+                    <span className="text-sm font-medium text-foreground">Bulk Creation</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Generate multiple reels, each with different footage
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Generate multiple reels with different footage
                   </p>
                 </div>
                 <button
                   onClick={() => setIsBulk(!isBulk)}
-                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-                    isBulk ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
+                  className={cn(
+                    'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none',
+                    isBulk ? 'bg-violet-500' : 'bg-secondary border border-border'
+                  )}
                   aria-label="Toggle bulk creation"
                 >
                   <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                    className={cn(
+                      'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
                       isBulk ? 'translate-x-5' : 'translate-x-0'
-                    }`}
+                    )}
                   />
                 </button>
               </div>
 
               {isBulk && (
                 <div>
-                  <label className="block text-sm text-gray-300 mb-2">Number of reels</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-2">Number of reels</label>
                   <div className="flex gap-2">
                     {[2, 3, 5].map((n) => (
                       <button
                         key={n}
                         onClick={() => setReelCount(n)}
-                        className={`px-5 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                        className={cn(
+                          'px-5 py-2 rounded-xl text-sm font-semibold border transition-all',
                           reelCount === n
-                            ? 'bg-purple-600 border-purple-500 text-white'
-                            : 'bg-white/5 border-white/10 text-gray-400 hover:border-purple-500/40 hover:text-purple-400'
-                        }`}
+                            ? 'bg-violet-500/15 border-violet-400/40 text-violet-400'
+                            : 'bg-secondary border-border text-muted-foreground hover:border-violet-400/30 hover:text-violet-400'
+                        )}
                       >
                         {n}
                       </button>
@@ -314,7 +327,7 @@ export default function ReelsPage() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
           {(validationError || error) && (
             <ErrorBanner message={validationError || error!} />
@@ -323,7 +336,7 @@ export default function ReelsPage() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !keywords.length || !selectedAudioId}
-            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30"
+            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
           >
             {isBulk ? (
               <>
@@ -339,50 +352,50 @@ export default function ReelsPage() {
 
       {isActive && !allSettled && (
         <div className="space-y-5">
-          <div className="flex flex-col items-center gap-5 py-8">
+          <div className="flex flex-col items-center gap-5 py-12">
             <Loader2
-              className="w-14 h-14 animate-spin text-blue-400"
+              className="w-12 h-12 animate-spin text-primary"
               style={{ animationDuration: '3s' }}
             />
             <div className="text-center">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-base font-semibold text-foreground">
                 {jobs.length > 1 ? `Generating ${jobs.length} reels…` : 'Generating reel…'}
               </h2>
-              <p className="text-xs text-gray-500 mt-1">Hang tight — this takes a minute</p>
+              <p className="text-xs text-muted-foreground mt-1">Hang tight — this takes a minute</p>
             </div>
           </div>
 
           {jobs.length === 0 ? (
-            <div className="p-5 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-400 shrink-0" />
-              <span className="text-sm text-gray-400">Starting up…</span>
+            <div className="p-5 bg-secondary/50 rounded-xl border border-border flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+              <span className="text-sm text-muted-foreground">Starting up…</span>
             </div>
           ) : (
             jobs.map((job, i) => (
-              <div key={job.job_id} className="p-5 bg-white/5 rounded-xl border border-white/10">
+              <div key={job.job_id} className="p-5 bg-secondary/50 rounded-xl border border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
                     {job.status === 'done' ? (
-                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <CheckCircle className="w-4 h-4 text-emerald-400" />
                     ) : job.status === 'failed' ? (
-                      <AlertCircle className="w-4 h-4 text-red-400" />
+                      <AlertCircle className="w-4 h-4 text-destructive" />
                     ) : (
-                      <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
                     )}
-                    <span className="text-sm font-medium text-white">
+                    <span className="text-sm font-medium text-foreground">
                       {jobs.length > 1 ? `Reel ${i + 1} of ${jobs.length}` : 'Reel'}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusLabel status={job.status} />
-                    <span className="text-sm font-semibold text-white tabular-nums">
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
                       {job.progress}%
                     </span>
                   </div>
                 </div>
                 <ProgressBar progress={job.progress} status={job.status} />
                 {job.error_message && (
-                  <p className="mt-2 text-xs text-red-400">{job.error_message}</p>
+                  <p className="mt-2 text-xs text-destructive">{job.error_message}</p>
                 )}
               </div>
             ))
@@ -393,8 +406,8 @@ export default function ReelsPage() {
       {allSettled && (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-400" />
-            <h2 className="text-lg font-semibold text-white">
+            <CheckCircle className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-base font-semibold text-foreground">
               {doneJobs.length} of {jobs.length} reel{jobs.length !== 1 ? 's' : ''} ready
             </h2>
           </div>
@@ -406,7 +419,7 @@ export default function ReelsPage() {
                   <VideoPreview reelId={doneJobs[0].reel_id!} />
                   <button
                     onClick={() => handleDownload(doneJobs[0].reel_id!)}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
                   >
                     <Download className="w-4 h-4" />
                     Download Reel
@@ -414,16 +427,16 @@ export default function ReelsPage() {
                 </div>
               ) : (
                 <div>
-                  <p className="text-center text-sm text-gray-400 mb-4">
+                  <p className="text-center text-sm text-muted-foreground mb-4">
                     {previewIndex + 1} / {doneJobs.length}
                   </p>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setPreviewIndex((p) => Math.max(0, p - 1))}
                       disabled={previewIndex === 0}
-                      className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-not-allowed transition-all shrink-0"
+                      className="p-2.5 rounded-full bg-secondary hover:bg-secondary/80 border border-border disabled:opacity-25 disabled:cursor-not-allowed transition-all shrink-0"
                     >
-                      <ChevronLeft className="w-5 h-5 text-white" />
+                      <ChevronLeft className="w-5 h-5 text-foreground" />
                     </button>
                     <div className="flex-1 flex justify-center">
                       <VideoPreview
@@ -434,9 +447,9 @@ export default function ReelsPage() {
                     <button
                       onClick={() => setPreviewIndex((p) => Math.min(doneJobs.length - 1, p + 1))}
                       disabled={previewIndex === doneJobs.length - 1}
-                      className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-not-allowed transition-all shrink-0"
+                      className="p-2.5 rounded-full bg-secondary hover:bg-secondary/80 border border-border disabled:opacity-25 disabled:cursor-not-allowed transition-all shrink-0"
                     >
-                      <ChevronRight className="w-5 h-5 text-white" />
+                      <ChevronRight className="w-5 h-5 text-foreground" />
                     </button>
                   </div>
 
@@ -445,9 +458,10 @@ export default function ReelsPage() {
                       <button
                         key={i}
                         onClick={() => setPreviewIndex(i)}
-                        className={`h-2 rounded-full transition-all duration-200 ${
-                          i === previewIndex ? 'bg-blue-400 w-5' : 'bg-white/30 hover:bg-white/50 w-2'
-                        }`}
+                        className={cn(
+                          'h-1.5 rounded-full transition-all duration-200',
+                          i === previewIndex ? 'bg-primary w-5' : 'bg-border hover:bg-muted-foreground w-1.5'
+                        )}
                       />
                     ))}
                   </div>
@@ -455,14 +469,14 @@ export default function ReelsPage() {
                   <div className="flex justify-center gap-3 mt-6">
                     <button
                       onClick={() => handleDownload(doneJobs[previewIndex].reel_id!, previewIndex)}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
+                      className="px-5 py-2.5 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
                     >
                       <Download className="w-4 h-4" />
                       Download This
                     </button>
                     <button
                       onClick={handleDownloadAll}
-                      className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
                     >
                       <Download className="w-4 h-4" />
                       Download All ({doneJobs.length})
@@ -484,7 +498,7 @@ export default function ReelsPage() {
 
           <button
             onClick={reset}
-            className="w-full px-6 py-3 bg-white/10 hover:bg-white/15 text-white font-semibold rounded-xl transition-colors"
+            className="w-full px-6 py-3 bg-secondary hover:bg-secondary/80 border border-border text-foreground font-semibold rounded-xl transition-colors"
           >
             Generate More
           </button>

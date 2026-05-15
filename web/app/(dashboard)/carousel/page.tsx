@@ -134,7 +134,7 @@ export default function CarouselPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
+    <div className="flex h-full bg-background">
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Section - Upload or Preview */}
@@ -145,14 +145,15 @@ export default function CarouselPage() {
             </div>
           ) : slides.length === 0 ? (
             <div className="text-center">
-              <p className="text-gray-400 mb-4">
-                ✓ File uploaded: <span className="text-white font-mono">{uploadedFile.name}</span>
+              <p className="text-muted-foreground mb-4">
+                ✓ File uploaded:{' '}
+                <span className="text-foreground font-mono">{uploadedFile.name}</span>
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {content.length} characters extracted
               </p>
               {error && (
-                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
                   {error}
                 </div>
               )}
@@ -188,7 +189,7 @@ export default function CarouselPage() {
         {/* Error Messages */}
         {error && slides.length === 0 && (
           <div className="px-8 pb-4">
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-sm">
               {error}
             </div>
           </div>
@@ -199,7 +200,7 @@ export default function CarouselPage() {
           {!uploadedFile ? (
             <button
               onClick={() => setUploadedFile(null)}
-              className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium"
+              className="px-6 py-2 bg-secondary border border-border text-muted-foreground rounded-xl text-sm font-medium cursor-not-allowed opacity-50"
               disabled
             >
               Clear
@@ -213,7 +214,7 @@ export default function CarouselPage() {
                   setSlides([]);
                   setError(null);
                 }}
-                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium"
+                className="px-6 py-2 bg-secondary hover:bg-secondary/80 border border-border text-foreground rounded-xl text-sm font-medium transition-colors"
               >
                 Clear
               </button>
@@ -221,10 +222,10 @@ export default function CarouselPage() {
                 <button
                   onClick={handleExport}
                   disabled={isExporting}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+                  className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
                 >
                   {isExporting && <Loader className="w-4 h-4 animate-spin" />}
-                  {isExporting ? 'Exporting...' : 'Export as ZIP'}
+                  {isExporting ? 'Exporting…' : 'Export as ZIP'}
                 </button>
               )}
             </>
