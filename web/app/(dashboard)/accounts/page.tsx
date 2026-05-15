@@ -176,7 +176,7 @@ function AccountCard({
           <span><span className="font-semibold text-foreground">{fmt(account.following_count)}</span> following</span>
         </div>
         {account.auth_method === "oauth" ? (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/35">
             Official API
           </span>
         ) : (
@@ -201,14 +201,14 @@ function AccountCard({
 function StatusBadge({ status }: { status: string }) {
   if (status === "connected") {
     return (
-      <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/35">
         <CheckCircle2 className="w-2.5 h-2.5" />
         Connected
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+    <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/35">
       <AlertCircle className="w-2.5 h-2.5" />
       Disconnected
     </span>
@@ -347,7 +347,7 @@ function ConnectModal({
                   <div>
                     <p className="text-xs font-semibold text-foreground mb-0.5">
                       Login with Instagram{" "}
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-1">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 ml-1">
                         Recommended
                       </span>
                     </p>
@@ -431,7 +431,7 @@ function ConnectModal({
                 exit={{ opacity: 0, x: -12 }}
                 className="space-y-4"
               >
-                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/25">
                   <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0" />
                   <p className="text-sm text-muted-foreground">
                     Enter the 6-digit code from your authenticator app.
@@ -475,7 +475,7 @@ function ConnectModal({
                 exit={{ opacity: 0, x: -12 }}
                 className="space-y-4"
               >
-                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/15">
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
                   <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
                   <p className="text-sm text-muted-foreground">
                     Instagram sent a verification code to your{" "}

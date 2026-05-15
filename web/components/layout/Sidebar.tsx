@@ -46,8 +46,8 @@ export default function Sidebar() {
             className={cn(
               "flex items-center gap-3 px-3 h-9 rounded-lg transition-all duration-150 text-sm font-medium",
               isActive(href)
-                ? "bg-primary/12 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                ? "bg-primary/20 text-primary ring-1 ring-primary/25"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
             )}
           >
             <Icon className="w-4 h-4 shrink-0" />

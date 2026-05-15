@@ -21,8 +21,8 @@ const TOOLS = [
     label: "Carousel",
     description: "Upload a document and let AI turn it into beautiful Instagram carousel slides.",
     color: "text-violet-400",
-    bg: "bg-violet-400/10",
-    ring: "group-hover:ring-violet-400/20",
+    bg: "bg-violet-400/15",
+    ring: "group-hover:ring-violet-400/30",
   },
   {
     href: "/reels",
@@ -30,8 +30,8 @@ const TOOLS = [
     label: "Reels",
     description: "Enter keywords, pick a track, and generate a 1080×1920 short-form video automatically.",
     color: "text-blue-400",
-    bg: "bg-blue-400/10",
-    ring: "group-hover:ring-blue-400/20",
+    bg: "bg-blue-400/15",
+    ring: "group-hover:ring-blue-400/30",
   },
   {
     href: "/publish",
@@ -39,8 +39,8 @@ const TOOLS = [
     label: "Publish",
     description: "Post immediately or schedule content across your Instagram accounts.",
     color: "text-emerald-400",
-    bg: "bg-emerald-400/10",
-    ring: "group-hover:ring-emerald-400/20",
+    bg: "bg-emerald-400/15",
+    ring: "group-hover:ring-emerald-400/30",
   },
   {
     href: "/accounts",
@@ -48,8 +48,8 @@ const TOOLS = [
     label: "Accounts",
     description: "Connect and manage your Instagram accounts for publishing and automation.",
     color: "text-pink-400",
-    bg: "bg-pink-400/10",
-    ring: "group-hover:ring-pink-400/20",
+    bg: "bg-pink-400/15",
+    ring: "group-hover:ring-pink-400/30",
   },
   {
     href: "/automation",
@@ -57,8 +57,8 @@ const TOOLS = [
     label: "Automation",
     description: "Set up auto-reply rules, follower tracking, welcome DMs, and growth actions.",
     color: "text-amber-400",
-    bg: "bg-amber-400/10",
-    ring: "group-hover:ring-amber-400/20",
+    bg: "bg-amber-400/15",
+    ring: "group-hover:ring-amber-400/30",
   },
 ];
 
