@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { CarouselTemplate } from '@/lib/carouselTemplates';
 import { TemplateGallery } from '@/components/carousel/TemplateGallery';
 import { CarouselSetup, SetupConfig } from '@/components/carousel/CarouselSetup';
@@ -27,51 +28,54 @@ async function buildSlideStates(
   const c = new Canvas(tempEl, { width: 540, height: 540, renderOnAddRemove: false });
   const states: object[] = [];
 
-  for (let i = 0; i < slides.length; i++) {
-    c.clear();
+  try {
+    for (let i = 0; i < slides.length; i++) {
+      c.clear();
 
-    const bg = new Rect({
-      left: 0, top: 0, width: 540, height: 540,
-      fill: new Gradient({
-        type: 'linear',
-        gradientUnits: 'pixels',
-        coords: { x1: 0, y1: 0, x2: 540, y2: 540 },
-        colorStops: [
-          { offset: 0, color: template.gradientFrom },
-          { offset: 1, color: template.gradientTo },
-        ],
-      }),
-      selectable: false, evented: false,
-      data: { role: 'bg' },
-    });
-    c.add(bg);
+      const bg = new Rect({
+        left: 0, top: 0, width: 540, height: 540,
+        fill: new Gradient({
+          type: 'linear',
+          gradientUnits: 'pixels',
+          coords: { x1: 0, y1: 0, x2: 540, y2: 540 },
+          colorStops: [
+            { offset: 0, color: template.gradientFrom },
+            { offset: 1, color: template.gradientTo },
+          ],
+        }),
+        selectable: false, evented: false,
+        data: { role: 'bg' },
+      });
+      c.add(bg);
 
-    c.add(new IText(String(i + 1).padStart(2, '0'), {
-      left: 40, top: 40, fontSize: 20, fontWeight: 'bold',
-      fill: template.accentColor, fontFamily: template.fontFamily,
-    }));
-    c.add(new IText(`/ ${slides.length}`, {
-      left: 74, top: 48, fontSize: 13,
-      fill: template.contentColor, fontFamily: template.fontFamily,
-    }));
-    c.add(new Textbox(slides[i].title, {
-      left: 40, top: 110, width: 460, fontSize: 34, fontWeight: 'bold',
-      fill: template.titleColor, fontFamily: template.fontFamily, lineHeight: 1.2,
-    }));
-    c.add(new Textbox(slides[i].content, {
-      left: 40, top: 260, width: 460, fontSize: 18,
-      fill: template.contentColor, fontFamily: template.fontFamily, lineHeight: 1.6,
-    }));
-    c.add(new IText(carouselTitle, {
-      left: 40, top: 490, fontSize: 14,
-      fill: template.accentColor, fontFamily: template.fontFamily,
-    }));
+      c.add(new IText(String(i + 1).padStart(2, '0'), {
+        left: 40, top: 40, fontSize: 20, fontWeight: 'bold',
+        fill: template.accentColor, fontFamily: template.fontFamily,
+      }));
+      c.add(new IText(`/ ${slides.length}`, {
+        left: 74, top: 48, fontSize: 13,
+        fill: template.contentColor, fontFamily: template.fontFamily,
+      }));
+      c.add(new Textbox(slides[i].title, {
+        left: 40, top: 110, width: 460, fontSize: 34, fontWeight: 'bold',
+        fill: template.titleColor, fontFamily: template.fontFamily, lineHeight: 1.2,
+      }));
+      c.add(new Textbox(slides[i].content, {
+        left: 40, top: 260, width: 460, fontSize: 18,
+        fill: template.contentColor, fontFamily: template.fontFamily, lineHeight: 1.6,
+      }));
+      c.add(new IText(carouselTitle, {
+        left: 40, top: 490, fontSize: 14,
+        fill: template.accentColor, fontFamily: template.fontFamily,
+      }));
 
-    c.renderAll();
-    states.push(c.toJSON());
+      c.renderAll();
+      states.push(c.toJSON());
+    }
+  } finally {
+    c.dispose();
   }
 
-  c.dispose();
   return states;
 }
 
@@ -84,31 +88,29 @@ function StepIndicator({ step, onGoTo }: { step: Step; onGoTo: (s: Step) => void
         return (
           <div key={s.n} className="flex items-center">
             <button
-              onClick={() => done && onGoTo(s.n)}
+              onClick={() => onGoTo(s.n)}
               disabled={!done}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs transition-all ${
-                active
-                  ? 'text-white'
-                  : done
-                  ? 'text-zinc-400 hover:text-white cursor-pointer'
-                  : 'text-zinc-600 cursor-default'
-              }`}
+              className={cn(
+                'flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs transition-all',
+                active ? 'text-white' : done ? 'text-zinc-400 hover:text-white cursor-pointer' : 'text-zinc-600 cursor-default',
+              )}
             >
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all ${
+                className={cn(
+                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all',
                   active
                     ? 'bg-purple-500 text-white ring-2 ring-purple-500/30'
                     : done
                     ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
-                    : 'bg-zinc-800 text-zinc-600'
-                }`}
+                    : 'bg-zinc-800 text-zinc-600',
+                )}
               >
                 {done ? '✓' : s.n}
               </span>
-              <span className={`font-medium ${active ? 'text-white' : ''}`}>{s.label}</span>
+              <span className={cn('font-medium', active && 'text-white')}>{s.label}</span>
             </button>
             {i < STEPS.length - 1 && (
-              <div className={`w-8 h-px mx-1 ${step > s.n ? 'bg-emerald-500/40' : 'bg-zinc-800'}`} />
+              <div className={cn('w-8 h-px mx-1', step > s.n ? 'bg-emerald-500/40' : 'bg-zinc-800')} />
             )}
           </div>
         );

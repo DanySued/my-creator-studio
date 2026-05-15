@@ -81,9 +81,8 @@ export default function Sidebar() {
           Settings
         </Link>
         <button
-          onClick={async () => {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            router.push('/login');
+          onClick={() => {
+            fetch('/api/auth/logout', { method: 'POST' }).finally(() => router.push('/login'));
           }}
           className="flex w-full items-center gap-3 px-3 h-9 rounded-lg transition-all duration-150 text-sm font-medium text-muted-foreground hover:text-red-400 hover:bg-red-500/[0.07]"
         >

@@ -10,34 +10,37 @@ const PROTECTED = [
   '/settings',
 ];
 
-async function verifyToken(token: string): Promise<boolean> {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) return false;
+const encoder = new TextEncoder();
+const HEX_PAIR = /.{1,2}/g;
 
+let cachedKey: CryptoKey | null = null;
+let cachedSecret: string | null = null;
+
+async function getKey(): Promise<CryptoKey | null> {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return null;
+  if (cachedKey && cachedSecret === secret) return cachedKey;
+  cachedKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  cachedSecret = secret;
+  return cachedKey;
+}
+
+async function verifyToken(token: string): Promise<boolean> {
   const dotIndex = token.indexOf('.');
   if (dotIndex === -1) return false;
-
-  const sigHex = token.slice(0, dotIndex);
-  const message = token.slice(dotIndex + 1);
-
   try {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify'],
-    );
-    const sigBytes = new Uint8Array(
-      sigHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)),
-    );
-    return await crypto.subtle.verify(
-      'HMAC',
-      key,
-      sigBytes,
-      encoder.encode(message),
-    );
+    const key = await getKey();
+    if (!key) return false;
+    const sigHex = token.slice(0, dotIndex);
+    const message = token.slice(dotIndex + 1);
+    const sigBytes = new Uint8Array(sigHex.match(HEX_PAIR)!.map((b) => parseInt(b, 16)));
+    return await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(message));
   } catch {
     return false;
   }

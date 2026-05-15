@@ -103,7 +103,6 @@ export function CarouselSetup({ onGenerate, isGenerating }: Props) {
           )}
         </div>
 
-        {/* Divider */}
         <div className="h-px bg-zinc-800/60" />
 
         {/* Title */}

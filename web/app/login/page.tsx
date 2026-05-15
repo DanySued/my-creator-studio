@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
 
@@ -28,9 +28,7 @@ function LoginForm() {
         setError(data.error || 'Invalid password');
         return;
       }
-      const next = searchParams.get('next') || '/dashboard';
-      router.push(next);
-      router.refresh();
+      router.push(searchParams.get('next') || '/dashboard');
     } catch {
       setError('Something went wrong. Try again.');
     } finally {
@@ -86,12 +84,10 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Ambient glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-purple-900/20 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[200px] bg-indigo-900/15 blur-[100px] rounded-full pointer-events-none" />
 
       <div className="relative w-full max-w-sm">
-        {/* Brand */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600/30 to-indigo-600/20 ring-1 ring-purple-500/40 flex items-center justify-center mb-4 shadow-xl shadow-purple-900/20">
             <Sparkles className="w-6 h-6 text-purple-400" />
@@ -100,13 +96,11 @@ export default function LoginPage() {
           <p className="text-sm text-zinc-500 mt-1">Your personal content automation hub</p>
         </div>
 
-        {/* Card */}
         <div className="bg-zinc-900/70 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-6 shadow-2xl shadow-black/40">
           <div className="mb-5">
             <h2 className="text-base font-semibold text-white">Welcome back</h2>
             <p className="text-xs text-zinc-500 mt-0.5">Enter your password to access the studio</p>
           </div>
-
           <Suspense>
             <LoginForm />
           </Suspense>
