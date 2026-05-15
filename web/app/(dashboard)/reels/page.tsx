@@ -106,6 +106,7 @@ export default function ReelsPage() {
 
   const [songStartTime, setSongStartTime] = useState(0);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -134,18 +135,19 @@ export default function ReelsPage() {
     }
     if (audioRef.current) audioRef.current.pause();
     setIsPreviewPlaying(false);
+    setIsPreviewLoading(false);
   };
 
   const togglePreview = () => {
-    if (isPreviewPlaying) {
+    if (isPreviewPlaying || isPreviewLoading) {
       stopPreview();
       return;
     }
     const audio = audioRef.current;
     if (!audio) return;
     audio.currentTime = effectiveSongStartTime;
+    setIsPreviewLoading(true);
     audio.play();
-    setIsPreviewPlaying(true);
     previewTimerRef.current = setTimeout(() => {
       audio.pause();
       setIsPreviewPlaying(false);
@@ -325,14 +327,16 @@ export default function ReelsPage() {
                     onClick={togglePreview}
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-                      isPreviewPlaying
+                      isPreviewPlaying || isPreviewLoading
                         ? 'bg-primary/10 border-primary/40 text-primary'
                         : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
                     )}
                   >
-                    {isPreviewPlaying
-                      ? <><Square className="w-3 h-3" /> Stop</>
-                      : <><Play className="w-3 h-3" /> Preview {duration}s</>
+                    {isPreviewLoading
+                      ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading…</>
+                      : isPreviewPlaying
+                        ? <><Square className="w-3 h-3" /> Stop</>
+                        : <><Play className="w-3 h-3" /> Preview {duration}s</>
                     }
                   </button>
                 </div>
@@ -340,6 +344,7 @@ export default function ReelsPage() {
                   ref={audioRef}
                   src={`/api/reels/audio/${selectedAudio.id}`}
                   preload="metadata"
+                  onPlaying={() => { setIsPreviewLoading(false); setIsPreviewPlaying(true); }}
                   onEnded={() => setIsPreviewPlaying(false)}
                 />
               </div>
