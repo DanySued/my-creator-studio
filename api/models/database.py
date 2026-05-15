@@ -15,7 +15,6 @@ if _DATABASE_URL:
         port=_p.port or 5432,
         user=_p.username,
         password=_p.password,
-        sslmode="require",
     )
 else:
     from peewee import SqliteDatabase
