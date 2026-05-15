@@ -212,8 +212,11 @@ export default function ReelsPage() {
   const [songStartTime, setSongStartTime] = useState(0);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewProgress, setPreviewProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewPlayStartRef = useRef<number>(0);
 
   const [overlays, setOverlays] = useState<TextOverlay[]>([
     { id: '1', text: '', x: 50, y: 82, font: 'sans', bold: false, italic: false },
@@ -265,9 +268,14 @@ export default function ReelsPage() {
       clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
     }
+    if (previewIntervalRef.current) {
+      clearInterval(previewIntervalRef.current);
+      previewIntervalRef.current = null;
+    }
     if (audioRef.current) audioRef.current.pause();
     setIsPreviewPlaying(false);
     setIsPreviewLoading(false);
+    setPreviewProgress(0);
   };
 
   const togglePreview = () => {
@@ -285,6 +293,27 @@ export default function ReelsPage() {
       setIsPreviewPlaying(false);
     }, duration * 1000);
   };
+
+  useEffect(() => {
+    if (!isPreviewPlaying) {
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+      return;
+    }
+    previewPlayStartRef.current = Date.now();
+    previewIntervalRef.current = setInterval(() => {
+      const elapsed = (Date.now() - previewPlayStartRef.current) / 1000;
+      setPreviewProgress(Math.min(elapsed, duration));
+    }, 80);
+    return () => {
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+    };
+  }, [isPreviewPlaying, duration]);
 
   const handleCleanup = async () => {
     setCleanupState({ status: 'loading' });
@@ -462,6 +491,20 @@ export default function ReelsPage() {
                   disabled={maxStartTime === 0}
                   className="w-full accent-primary disabled:opacity-40"
                 />
+                {(isPreviewPlaying || isPreviewLoading) && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
+                      <span>{formatTime(effectiveSongStartTime + previewProgress)}</span>
+                      <span>{formatTime(effectiveSongStartTime + duration)}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full"
+                        style={{ width: `${(previewProgress / duration) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
                     Full track: {formatTime(selectedAudio.duration)}
