@@ -9,7 +9,7 @@ My Creator Studio is a self-hosted Instagram content automation platform. It has
 - **`api/`** — Python FastAPI backend (port 8000), running via Uvicorn inside Docker
 - **`web/`** — Next.js 16 frontend (port 3000), also Dockerized
 
-Both services are orchestrated with `docker-compose.yml`. The database is SQLite (Peewee ORM), persisted in a Docker volume at `/data/studio.db`. Generated media (reels, carousel slides) lives in `/media/`, mounted from `./media/` on the host.
+Both services are orchestrated with `docker-compose.yml` for local development and deployed to **Railway** in production. The database is SQLite locally (Peewee ORM, persisted in a Docker volume at `/data/studio.db`) and PostgreSQL on Railway (via `DATABASE_URL`). Generated media (reels, carousel slides) lives in `/media/`, mounted from `./media/` on the host.
 
 ## Running the project
 
@@ -62,7 +62,7 @@ Routers in `api/routers/` are thin HTTP handlers. Business logic lives in `api/s
 | `automation.py` | Comment auto-reply, follower snapshots, welcome DMs, growth actions |
 | `job_queue.py` | APScheduler — background reel generation jobs and scheduled posts |
 
-## Architecture: database models (Peewee / SQLite)
+## Architecture: database models (Peewee ORM — SQLite locally / PostgreSQL on Railway)
 
 All models are in `api/models/database.py`. Key relationships:
 
@@ -91,10 +91,23 @@ See `.env.example` for the full list. Required external services:
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Meta Developer app (OAuth) |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Upstash Redis — job caching, rate limits |
 | `QSTASH_TOKEN` / signing keys | Upstash QStash — durable scheduled posts |
+| `DATABASE_URL` | PostgreSQL connection string — set automatically by Railway via `${{Postgres.DATABASE_URL}}` |
 
 ## Next.js version note
 
 This project uses **Next.js 16**, which has breaking changes from earlier versions. Before writing any Next.js code, check `web/node_modules/next/dist/docs/` for current API conventions. The `web/AGENTS.md` file (loaded as `web/CLAUDE.md`) contains this warning too.
+
+## Railway deployment
+
+Production runs on Railway (project: `soothing-fulfillment`, environment: `production`) with three services:
+
+| Service | Source | Public URL |
+|---|---|---|
+| `my-creator-studio` (API) | `api/` via `api/railway.toml` | `my-creator-studio-production.up.railway.app` |
+| `web` | `web/` via `web/railway.toml` | `web-production-77b4e.up.railway.app` |
+| `Postgres` | Railway managed image | internal only (`postgres.railway.internal:5432`) |
+
+Both app services deploy automatically on push to `master`. The API healthcheck path is `/health/backend`; the web healthcheck path is `/`. The web service reaches the API via Railway's private network using the `API_URL` environment variable (set to the API's internal Railway hostname).
 
 ## Reel generation flow
 
