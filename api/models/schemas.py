@@ -73,7 +73,9 @@ class ReelJobResponse(BaseModel):
     job_id: str
     reel_id: str | None
     status: str  # queued, processing, awaiting_clip_approval, done, failed
-    progress: int  # 0-100
+    progress: int  # 0-100 global (raw)
+    phase: int = 1         # 1 = preparing clips, 2 = rendering
+    phase_progress: int = 0  # 0-100 within the current phase
     error_message: str | None = None
     clip_count: int | None = None  # number of clips ready for review (when awaiting_clip_approval)
     created_at: datetime
