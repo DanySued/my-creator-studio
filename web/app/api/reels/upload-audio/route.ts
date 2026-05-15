@@ -12,9 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file is audio
-    const audioMimeTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/ogg'];
-    if (!audioMimeTypes.includes(file.type)) {
+    // Validate file is audio — check prefix only; browsers report inconsistent
+    // subtypes (e.g. audio/x-m4a vs audio/mp4, audio/mp3 vs audio/mpeg)
+    if (!file.type.startsWith('audio/')) {
       return NextResponse.json(
         { error: 'Unsupported audio format. Use MP3, WAV, M4A, or OGG' },
         { status: 400 }

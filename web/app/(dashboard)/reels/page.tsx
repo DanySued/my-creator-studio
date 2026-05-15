@@ -234,7 +234,7 @@ export default function ReelsPage() {
                 Upload Audio
                 <input
                   type="file"
-                  accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg"
+                  accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/x-m4a,audio/mp3,.mp3,.wav,.m4a,.ogg"
                   onChange={handleAudioUpload}
                   className="hidden"
                   disabled={isLoadingAudio}

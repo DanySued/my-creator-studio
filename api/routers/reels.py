@@ -83,9 +83,9 @@ async def upload_audio(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
-    # Validate audio format
-    allowed_types = {"audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg"}
-    if file.content_type not in allowed_types:
+    # Validate audio format — prefix check only; browsers report inconsistent
+    # subtypes (e.g. audio/x-m4a vs audio/mp4, audio/mp3 vs audio/mpeg)
+    if not (file.content_type or "").startswith("audio/"):
         raise HTTPException(status_code=400, detail="Unsupported audio format")
 
     audio_id = str(uuid.uuid4())
