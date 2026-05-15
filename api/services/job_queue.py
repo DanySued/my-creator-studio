@@ -19,6 +19,7 @@ from services.video import (
 import os
 import math
 import random
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -170,6 +171,13 @@ def _process_reel_generation(
             results = list(pool.map(_trim_one, enumerate(videos[:target_clip_count])))
         clips = [p for p in results if p is not None]
 
+        # Free raw downloads — no longer needed after trimming
+        for p in video_paths:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
         if not clips:
             raise ValueError("Could not create any video clips")
 
@@ -184,6 +192,7 @@ def _process_reel_generation(
                     start = random.uniform(0, max(0.0, video_dur - clip_duration))
                     retrimmed_path = clip_path.replace(f"clip_{idx}.mp4", f"clip_{idx}_rt.mp4")
                     trim_video(clip_path, retrimmed_path, start, clip_duration)
+                    os.remove(clip_path)
                     return retrimmed_path
                 except Exception:
                     return clip_path
@@ -197,6 +206,8 @@ def _process_reel_generation(
 
         concat_path = os.path.join(reel_dir, "concat.mp4")
         concatenate_videos(clips, concat_path)
+        # Free clips dir — no longer needed after concat
+        shutil.rmtree(clips_dir, ignore_errors=True)
 
         # Step 4: Scale to Instagram Reels format (75%)
         job.progress = 75
@@ -204,6 +215,7 @@ def _process_reel_generation(
 
         scaled_path = os.path.join(reel_dir, "scaled.mp4")
         scale_to_instagram_reels(concat_path, scaled_path)
+        os.remove(concat_path)
 
         # Step 5: Mix audio with optional start offset (90%)
         job.progress = 90
@@ -217,6 +229,7 @@ def _process_reel_generation(
             audio_mixed_path,
             audio_start_time=request.song_start_time,
         )
+        os.remove(scaled_path)
 
         # Step 6: Burn text overlay unless no_text is set (95%)
         job.progress = 95
@@ -236,6 +249,7 @@ def _process_reel_generation(
                     x_pct=request.overlay_x,
                     y_pct=request.overlay_y,
                 )
+                os.remove(audio_mixed_path)
             else:
                 os.rename(audio_mixed_path, final_path)
 
@@ -256,6 +270,10 @@ def _process_reel_generation(
         job.completed_at = datetime.now()
         job.save()
         JOBS[job_id] = {"status": "failed", "progress": job.progress, "error": str(e)}
+        # Clean up temp files so a failed job doesn't leak disk space
+        MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+        reel_dir = os.path.join(MEDIA_DIR, "generated", "reels", reel_id)
+        shutil.rmtree(reel_dir, ignore_errors=True)
 
 
 def get_job_status(job_id: str) -> dict:

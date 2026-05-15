@@ -1,5 +1,6 @@
 """Reels generation API endpoints."""
 import os
+import shutil
 import uuid
 from fastapi import APIRouter, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
@@ -170,6 +171,60 @@ async def list_reels():
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list reels: {str(e)}")
+
+
+@router.post("/cleanup-temp")
+async def cleanup_temp_files():
+    """
+    Delete orphaned temp files left by failed or in-progress reel jobs.
+    - Reel dirs with final.mp4: keeps only final.mp4, deletes intermediate files.
+    - Reel dirs without final.mp4: deletes the entire directory.
+    Returns freed_mb and dirs_cleaned.
+    """
+    reels_base = os.path.join(MEDIA_DIR, "generated", "reels")
+    if not os.path.isdir(reels_base):
+        return {"freed_mb": 0, "dirs_cleaned": 0}
+
+    freed_bytes = 0
+    dirs_cleaned = 0
+
+    for reel_id in os.listdir(reels_base):
+        reel_dir = os.path.join(reels_base, reel_id)
+        if not os.path.isdir(reel_dir):
+            continue
+
+        final_path = os.path.join(reel_dir, "final.mp4")
+        if os.path.exists(final_path):
+            # Keep only final.mp4; delete everything else
+            for entry in os.listdir(reel_dir):
+                if entry == "final.mp4":
+                    continue
+                entry_path = os.path.join(reel_dir, entry)
+                try:
+                    if os.path.isdir(entry_path):
+                        for f in _walk_files(entry_path):
+                            freed_bytes += os.path.getsize(f)
+                        shutil.rmtree(entry_path, ignore_errors=True)
+                    else:
+                        freed_bytes += os.path.getsize(entry_path)
+                        os.remove(entry_path)
+                    dirs_cleaned += 1
+                except OSError:
+                    pass
+        else:
+            # Orphaned — no final output; wipe entire dir
+            for f in _walk_files(reel_dir):
+                freed_bytes += os.path.getsize(f)
+            shutil.rmtree(reel_dir, ignore_errors=True)
+            dirs_cleaned += 1
+
+    return {"freed_mb": round(freed_bytes / 1_048_576, 1), "dirs_cleaned": dirs_cleaned}
+
+
+def _walk_files(path: str):
+    for root, _, files in os.walk(path):
+        for f in files:
+            yield os.path.join(root, f)
 
 
 @router.get("/download/{reel_id}")
