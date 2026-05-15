@@ -99,7 +99,7 @@ This project uses **Next.js 16**, which has breaking changes from earlier versio
 
 ## Railway deployment
 
-Production runs on Railway (project: `soothing-fulfillment`, environment: `production`) with three services:
+Production runs on Railway (project: `my-creator-studio`, environment: `production`) with three services:
 
 | Service | Source | Public URL |
 |---|---|---|
