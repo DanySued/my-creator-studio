@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Download,
   Music,
@@ -12,6 +12,8 @@ import {
   Loader2,
   Upload,
   Trash2,
+  Play,
+  Square,
 } from 'lucide-react';
 import { KeywordEngine } from '@/components/reels/KeywordEngine';
 import { JobStatus, useReelGenerationContext } from '@/lib/ReelGenerationContext';
@@ -102,6 +104,11 @@ export default function ReelsPage() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
 
+  const [songStartTime, setSongStartTime] = useState(0);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [cleanupState, setCleanupState] = useState<
     { status: 'idle' } | { status: 'loading' } | { status: 'done'; freed_mb: number; dirs_cleaned: number }
   >({ status: 'idle' });
@@ -109,6 +116,41 @@ export default function ReelsPage() {
   const { jobs, isGenerating, error, startGeneration, reset } = useReelGenerationContext();
 
   const isActive = jobs.length > 0 || isGenerating;
+
+  const selectedAudio = audioFiles.find((a) => a.id === selectedAudioId) ?? null;
+  const maxStartTime = selectedAudio ? Math.max(0, selectedAudio.duration - duration) : 0;
+  const effectiveSongStartTime = Math.min(songStartTime, maxStartTime);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  const stopPreview = () => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    if (audioRef.current) audioRef.current.pause();
+    setIsPreviewPlaying(false);
+  };
+
+  const togglePreview = () => {
+    if (isPreviewPlaying) {
+      stopPreview();
+      return;
+    }
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = effectiveSongStartTime;
+    audio.play();
+    setIsPreviewPlaying(true);
+    previewTimerRef.current = setTimeout(() => {
+      audio.pause();
+      setIsPreviewPlaying(false);
+    }, duration * 1000);
+  };
 
   const handleCleanup = async () => {
     setCleanupState({ status: 'loading' });
@@ -176,7 +218,7 @@ export default function ReelsPage() {
     }
     setValidationError(null);
     setPreviewIndex(0);
-    await startGeneration(isBulk ? reelCount : 1, keywords, selectedAudioId, duration, reelTitle);
+    await startGeneration(isBulk ? reelCount : 1, keywords, selectedAudioId, duration, reelTitle, effectiveSongStartTime);
   };
 
   const handleDownload = (reelId: string, index?: number) => {
@@ -230,7 +272,11 @@ export default function ReelsPage() {
                       name="audio"
                       value={audio.id}
                       checked={selectedAudioId === audio.id}
-                      onChange={(e) => setSelectedAudioId(e.target.value)}
+                      onChange={(e) => {
+                        stopPreview();
+                        setSongStartTime(0);
+                        setSelectedAudioId(e.target.value);
+                      }}
                       className="mr-3 accent-primary"
                     />
                     <Music className={cn('w-4 h-4 mr-2.5', selectedAudioId === audio.id ? 'text-primary' : 'text-muted-foreground')} />
@@ -248,6 +294,54 @@ export default function ReelsPage() {
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">No audio tracks yet</p>
                 <p className="text-xs text-muted-foreground mb-4">Upload an MP3, WAV, or M4A file to get started</p>
+              </div>
+            )}
+
+            {selectedAudio && (
+              <div className="mt-3 p-4 bg-secondary/50 rounded-xl border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Song start time</span>
+                  <span className="text-xs font-semibold text-foreground tabular-nums">
+                    {formatTime(effectiveSongStartTime)} → {formatTime(Math.min(effectiveSongStartTime + duration, selectedAudio.duration))}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={maxStartTime}
+                  value={effectiveSongStartTime}
+                  onChange={(e) => {
+                    stopPreview();
+                    setSongStartTime(Number(e.target.value));
+                  }}
+                  disabled={maxStartTime === 0}
+                  className="w-full accent-primary disabled:opacity-40"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Full track: {formatTime(selectedAudio.duration)}
+                  </span>
+                  <button
+                    onClick={togglePreview}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                      isPreviewPlaying
+                        ? 'bg-primary/10 border-primary/40 text-primary'
+                        : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {isPreviewPlaying
+                      ? <><Square className="w-3 h-3" /> Stop</>
+                      : <><Play className="w-3 h-3" /> Preview {duration}s</>
+                    }
+                  </button>
+                </div>
+                <audio
+                  ref={audioRef}
+                  src={`/api/reels/audio/${selectedAudio.id}`}
+                  preload="metadata"
+                  onEnded={() => setIsPreviewPlaying(false)}
+                />
               </div>
             )}
 

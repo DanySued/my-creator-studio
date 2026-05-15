@@ -149,6 +149,20 @@ async def list_audio_files():
         raise HTTPException(status_code=500, detail=f"Failed to list audio: {str(e)}")
 
 
+@router.get("/audio/{audio_id}")
+async def stream_audio(audio_id: str):
+    """Stream an uploaded audio file for browser playback."""
+    try:
+        audio = AudioFile.get_by_id(audio_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    if not os.path.exists(audio.file_path):
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+
+    return FileResponse(path=audio.file_path, filename=audio.filename)
+
+
 @router.get("/list", response_model=ReelListResponse)
 async def list_reels():
     """

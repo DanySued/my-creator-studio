@@ -29,7 +29,8 @@ interface ReelGenerationContextValue {
     keywords: string[],
     audioFileId: string,
     duration: number,
-    title: string
+    title: string,
+    songStartTime?: number
   ) => Promise<void>;
   reset: () => void;
   dismiss: () => void;
@@ -94,7 +95,8 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
       keywords: string[],
       audioFileId: string,
       duration: number,
-      title: string
+      title: string,
+      songStartTime: number = 0
     ) => {
       setError(null);
       setIsGenerating(true);
@@ -114,6 +116,7 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
               audioFileId,
               duration,
               title: count > 1 ? `${title} ${i + 1}` : title,
+              songStartTime,
             }),
           })
         );
