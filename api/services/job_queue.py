@@ -366,6 +366,26 @@ def _phase2_render_reel(job_id: str, reel_id: str) -> None:
         shutil.rmtree(reel_dir, ignore_errors=True)
 
 
+def _compute_phase(status: str, progress: int) -> tuple[int, int]:
+    """Map (status, global progress 0-100) → (phase 1|2, phase_progress 0-100)."""
+    def _interp(val: int, stops: list[tuple[int, int]]) -> int:
+        for i in range(len(stops) - 1):
+            x0, y0 = stops[i]
+            x1, y1 = stops[i + 1]
+            if x0 <= val <= x1:
+                t = (val - x0) / (x1 - x0) if x1 != x0 else 0.0
+                return round(y0 + t * (y1 - y0))
+        return stops[-1][1]
+
+    if status == "awaiting_clip_approval":
+        return 1, 100
+    if status == "done":
+        return 2, 100
+    if progress >= 55:
+        return 2, _interp(progress, [(55, 0), (60, 15), (75, 45), (90, 75), (95, 90), (100, 100)])
+    return 1, _interp(progress, [(0, 0), (10, 10), (20, 40), (40, 80), (50, 100)])
+
+
 def get_job_status(job_id: str) -> dict:
     """Get the status of a reel generation job."""
     try:
@@ -376,11 +396,14 @@ def get_job_status(job_id: str) -> dict:
                 clip_count = len(json.loads(job.clip_paths))
             except Exception:
                 pass
+        phase, phase_progress = _compute_phase(job.status, job.progress)
         return {
             "job_id": job_id,
             "reel_id": job.reel.id if job.reel else None,
             "status": job.status,
             "progress": job.progress,
+            "phase": phase,
+            "phase_progress": phase_progress,
             "error_message": job.error_message,
             "clip_count": clip_count,
             "created_at": job.created_at.isoformat(),
@@ -391,16 +414,21 @@ def get_job_status(job_id: str) -> dict:
     except Exception:
         if job_id in JOBS:
             mem = JOBS[job_id]
+            mem_status = mem.get("status", "queued")
+            mem_progress = mem.get("progress", 0)
+            phase, phase_progress = _compute_phase(mem_status, mem_progress)
             return {
                 "job_id": job_id,
                 "reel_id": None,
-                "status": mem.get("status", "queued"),
-                "progress": mem.get("progress", 0),
+                "status": mem_status,
+                "progress": mem_progress,
+                "phase": phase,
+                "phase_progress": phase_progress,
                 "error_message": mem.get("error"),
                 "clip_count": mem.get("clip_count"),
                 "created_at": mem.get("created_at", datetime.now().isoformat()),
                 "completed_at": None,
-                "reels_done": 1 if mem.get("status") == "done" else 0,
+                "reels_done": 1 if mem_status == "done" else 0,
                 "reels_total": 1,
             }
         return {"status": "not_found", "error": "Job not found"}

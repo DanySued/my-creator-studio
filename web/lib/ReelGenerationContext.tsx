@@ -14,6 +14,8 @@ export interface JobStatus {
   reel_id: string | null;
   status: 'queued' | 'processing' | 'awaiting_clip_approval' | 'done' | 'failed';
   progress: number;
+  phase: 1 | 2;
+  phase_progress: number;
   error_message: string | null;
   clip_count: number | null;
   created_at: string;

@@ -30,10 +30,11 @@ interface AudioFile {
   duration: number;
 }
 
-function StatusLabel({ status }: { status: JobStatus['status'] }) {
+function StatusLabel({ status, phase }: { status: JobStatus['status']; phase?: 1 | 2 }) {
+  const processingLabel = phase === 2 ? 'Rendering' : 'Preparing clips';
   const labels: Record<JobStatus['status'], string> = {
     queued: 'Queued',
-    processing: 'Processing',
+    processing: processingLabel,
     awaiting_clip_approval: 'Review Clips',
     done: 'Complete',
     failed: 'Failed',
@@ -48,20 +49,36 @@ function StatusLabel({ status }: { status: JobStatus['status'] }) {
   return <span className={`text-xs font-medium ${colors[status]}`}>{labels[status]}</span>;
 }
 
-function ProgressBar({ progress, status }: { progress: number; status: JobStatus['status'] }) {
+function ProgressBar({ phaseProgress, status }: { phaseProgress: number; status: JobStatus['status'] }) {
   const isDone = status === 'done';
   const isFailed = status === 'failed';
+  const [displayed, setDisplayed] = useState(phaseProgress);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const step = () => {
+      setDisplayed((prev) => {
+        const diff = phaseProgress - prev;
+        if (Math.abs(diff) < 0.15) return phaseProgress;
+        return prev + diff * 0.07;
+      });
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [phaseProgress]);
+
   const barColor = isFailed
     ? 'from-red-500 to-red-600'
     : isDone
       ? 'from-emerald-500 to-green-500'
       : 'from-blue-500 to-purple-500';
-  const width = isDone || isFailed ? 100 : Math.max(progress, 4);
+  const width = isFailed ? 100 : isDone ? 100 : Math.max(displayed, 2);
 
   return (
     <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
       <div
-        className={`h-full bg-gradient-to-r ${barColor} relative overflow-hidden transition-all duration-700`}
+        className={`h-full bg-gradient-to-r ${barColor} relative overflow-hidden`}
         style={{ width: `${width}%` }}
       >
         {!isDone && !isFailed && (
@@ -365,6 +382,7 @@ export default function ReelsPage() {
     }
   };
   const allSettled = jobs.length > 0 && jobs.every((j) => j.status === 'done' || j.status === 'failed');
+  const currentPhase: 1 | 2 = jobs.some((j) => j.phase === 2) ? 2 : 1;
   const doneJobs = jobs.filter((j) => j.status === 'done' && j.reel_id);
 
   useEffect(() => {
@@ -888,9 +906,18 @@ export default function ReelsPage() {
             />
             <div className="text-center">
               <h2 className="text-base font-semibold text-foreground">
-                {jobs.length > 1 ? `Generating ${jobs.length} reels…` : 'Generating reel…'}
+                {currentPhase === 2
+                  ? jobs.length > 1 ? `Rendering ${jobs.length} reels…` : 'Rendering reel…'
+                  : jobs.length > 1 ? `Preparing clips for ${jobs.length} reels…` : 'Preparing clips…'}
               </h2>
-              <p className="text-xs text-muted-foreground mt-1">Hang tight — this takes a minute</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {currentPhase === 2
+                  ? 'Compositing, scaling, mixing audio…'
+                  : 'Searching and trimming footage from Pexels'}
+              </p>
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                Phase {currentPhase} of 2
+              </p>
             </div>
           </div>
 
@@ -916,13 +943,13 @@ export default function ReelsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <StatusLabel status={job.status} />
+                    <StatusLabel status={job.status} phase={job.phase} />
                     <span className="text-sm font-semibold text-foreground tabular-nums">
-                      {job.progress}%
+                      {Math.round(job.phase_progress ?? job.progress)}%
                     </span>
                   </div>
                 </div>
-                <ProgressBar progress={job.progress} status={job.status} />
+                <ProgressBar phaseProgress={job.phase_progress ?? job.progress} status={job.status} />
                 {job.error_message && (
                   <p className="mt-2 text-xs text-destructive">{job.error_message}</p>
                 )}
@@ -1024,9 +1051,11 @@ export default function ReelsPage() {
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                   <span className="text-xs font-medium text-foreground">Preparing clips…</span>
                 </div>
-                <span className="text-xs tabular-nums text-muted-foreground">{job.progress}%</span>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {Math.round(job.phase_progress ?? job.progress)}%
+                </span>
               </div>
-              <ProgressBar progress={job.progress} status={job.status} />
+              <ProgressBar phaseProgress={job.phase_progress ?? job.progress} status={job.status} />
             </div>
           ))}
         </div>

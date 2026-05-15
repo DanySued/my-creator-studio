@@ -16,9 +16,11 @@ export function GlobalReelStatus() {
     jobs.length > 0 && jobs.every((j) => j.status === 'done' || j.status === 'failed');
   const awaitingApproval = jobs.some((j) => j.status === 'awaiting_clip_approval');
   const doneCount = jobs.filter((j) => j.status === 'done').length;
+  const activeJob = jobs.find((j) => j.status !== 'done' && j.status !== 'failed') ?? jobs[0];
+  const currentPhase: 1 | 2 = activeJob?.phase ?? 1;
   const overallProgress =
     jobs.length > 0
-      ? Math.round(jobs.reduce((sum, j) => sum + j.progress, 0) / jobs.length)
+      ? Math.round(jobs.reduce((sum, j) => sum + (j.phase_progress ?? j.progress), 0) / jobs.length)
       : 0;
 
   // Show when: off the reels page, something is happening, and not dismissed
@@ -52,7 +54,9 @@ export function GlobalReelStatus() {
                         : 'Generating reel…'}
                   </p>
                   <p className="text-[10px] text-gray-500 mt-0.5">
-                    {awaitingApproval ? 'Tap to approve or swap clips' : `${overallProgress}% complete`}
+                    {awaitingApproval
+                      ? 'Tap to approve or swap clips'
+                      : `Phase ${currentPhase} of 2 — ${overallProgress}%`}
                   </p>
                 </div>
               </>
