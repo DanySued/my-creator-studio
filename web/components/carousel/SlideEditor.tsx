@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { CarouselTemplate } from '@/lib/carouselTemplates';
 import { EditorToolbar, SelectedInfo } from './EditorToolbar';
-import { Smartphone, Loader, ArrowRight } from 'lucide-react';
+import { Smartphone, Loader, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export interface SlideState {
   json: object;
@@ -15,9 +15,10 @@ interface Props {
   carouselTitle: string;
   onSlideStatesChange: (states: object[]) => void;
   onExportReady: (dataUrls: string[]) => void;
+  onBack?: () => void;
 }
 
-export function SlideEditor({ template, slideStates, carouselTitle, onSlideStatesChange, onExportReady }: Props) {
+export function SlideEditor({ template, slideStates, carouselTitle, onSlideStatesChange, onExportReady, onBack }: Props) {
   const canvasEl = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fabricRef = useRef<any>(null);
@@ -292,9 +293,19 @@ export function SlideEditor({ template, slideStates, carouselTitle, onSlideState
       <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 flex-shrink-0">
-          <span className="text-xs text-zinc-400">
-            Slide {currentSlide + 1} / {slideStates.length}
-          </span>
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs text-zinc-300 transition-colors"
+              >
+                <ArrowLeft size={13} /> Back
+              </button>
+            )}
+            <span className="text-xs text-zinc-400">
+              Slide {currentSlide + 1} / {slideStates.length}
+            </span>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={openPhonePreview}
