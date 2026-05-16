@@ -78,6 +78,7 @@ class ReelGenerateRequest(BaseModel):
     song_start_time: int = 0
     overlays: List[TextOverlayItem] = []  # empty list = no text
     count: int = 1
+    subtitles_enabled: bool = False  # auto-transcribe audio → burn subtitles + export .srt
 
 
 class ReelJobResponse(BaseModel):
@@ -94,6 +95,7 @@ class ReelJobResponse(BaseModel):
     completed_at: datetime | None = None
     reels_done: int = 0   # how many variations have completed (for bulk jobs)
     reels_total: int = 1  # total variations requested
+    srt_path: str | None = None  # path to generated .srt file, present when subtitles were enabled
 
 
 class ReelResponse(BaseModel):

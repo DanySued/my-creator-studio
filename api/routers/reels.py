@@ -351,3 +351,23 @@ async def download_reel(reel_id: str):
         media_type="video/mp4",
         filename=f"{reel.title.replace(' ', '_')}.mp4",
     )
+
+
+@router.get("/download/{reel_id}/srt")
+async def download_reel_srt(reel_id: str):
+    """
+    Download the .srt subtitle file for a reel (only available when subtitles were enabled).
+    """
+    try:
+        reel = Reel.get_by_id(reel_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Reel not found")
+
+    if not reel.srt_path or not os.path.exists(reel.srt_path):
+        raise HTTPException(status_code=404, detail="Subtitle file not found for this reel")
+
+    return FileResponse(
+        path=reel.srt_path,
+        media_type="text/plain",
+        filename=f"{reel.title.replace(' ', '_')}.srt",
+    )

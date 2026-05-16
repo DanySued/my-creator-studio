@@ -60,6 +60,7 @@ class Reel(BaseModel):
     duration = IntegerField()  # Video duration in seconds
     audio_path = CharField()  # Path to audio file
     output_path = CharField()  # Path to generated MP4
+    srt_path = CharField(null=True)  # Path to generated .srt subtitle file (if subtitles were enabled)
     created_at = DateTimeField(default=datetime.now)
 
     class Meta:
@@ -221,6 +222,7 @@ def init_db():
     for table, col, col_type in [
         ("reel_jobs", "clip_paths", "TEXT"),
         ("reel_jobs", "pending_request_data", "TEXT"),
+        ("reels", "srt_path", "TEXT"),
     ]:
         try:
             db.execute_sql(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")

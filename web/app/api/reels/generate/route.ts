@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
         title: body.title || 'Generated Reel',
         song_start_time: body.songStartTime || 0,
         overlays: body.overlays ?? [],
+        subtitles_enabled: body.subtitlesEnabled ?? false,
       }),
     });
 

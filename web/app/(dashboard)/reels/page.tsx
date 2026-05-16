@@ -30,8 +30,9 @@ interface AudioFile {
   duration: number;
 }
 
-function StatusLabel({ status, phase }: { status: JobStatus['status']; phase?: 1 | 2 }) {
-  const processingLabel = phase === 2 ? 'Rendering' : 'Preparing clips';
+function StatusLabel({ status, phase, progress }: { status: JobStatus['status']; phase?: 1 | 2; progress?: number }) {
+  let processingLabel = phase === 2 ? 'Rendering' : 'Preparing clips';
+  if (phase === 2 && progress !== undefined && progress >= 96) processingLabel = 'Generating subtitles';
   const labels: Record<JobStatus['status'], string> = {
     queued: 'Queued',
     processing: processingLabel,
@@ -237,6 +238,8 @@ export default function ReelsPage() {
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewPlayStartRef = useRef<number>(0);
+
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
 
   const [overlays, setOverlays] = useState<TextOverlay[]>([
     { id: '1', text: '', x: 50, y: 82, font: 'sans', bold: false, italic: false },
@@ -466,7 +469,7 @@ export default function ReelsPage() {
       duration,
       reelTitle,
       effectiveSongStartTime,
-      { overlays: activeOverlays }
+      { overlays: activeOverlays, subtitlesEnabled }
     );
   };
 
@@ -693,6 +696,35 @@ export default function ReelsPage() {
                     className={cn(
                       'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
                       isBulk ? 'translate-x-5' : 'translate-x-0'
+                    )}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-border">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h10M7 16h6" />
+                    </svg>
+                    <span className="text-sm font-medium text-foreground">Auto Subtitles</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Transcribe audio with AI — burns captions into the video and exports a .srt file
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSubtitlesEnabled(!subtitlesEnabled)}
+                  className={cn(
+                    'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none shrink-0',
+                    subtitlesEnabled ? 'bg-sky-500' : 'bg-secondary border border-border'
+                  )}
+                  aria-label="Toggle auto subtitles"
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                      subtitlesEnabled ? 'translate-x-5' : 'translate-x-0'
                     )}
                   />
                 </button>
@@ -942,7 +974,7 @@ export default function ReelsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <StatusLabel status={job.status} phase={job.phase} />
+                    <StatusLabel status={job.status} phase={job.phase} progress={job.progress} />
                     <span className="text-sm font-semibold text-foreground tabular-nums">
                       {Math.round(job.phase_progress ?? job.progress)}%
                     </span>
@@ -1074,13 +1106,25 @@ export default function ReelsPage() {
               {doneJobs.length === 1 ? (
                 <div className="flex flex-col items-center gap-5">
                   <VideoPreview reelId={doneJobs[0].reel_id!} />
-                  <button
-                    onClick={() => handleDownload(doneJobs[0].reel_id!)}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Reel
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleDownload(doneJobs[0].reel_id!)}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Reel
+                    </button>
+                    {doneJobs[0].srt_path && (
+                      <button
+                        onClick={() => triggerDownload(`/api/reels/download/${doneJobs[0].reel_id}/srt`, `${reelTitle.replace(/\s+/g, '_')}.srt`)}
+                        className="px-4 py-3 bg-sky-700 hover:bg-sky-600 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
+                        title="Download subtitle file (.srt)"
+                      >
+                        <Download className="w-4 h-4" />
+                        .srt
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -1123,7 +1167,7 @@ export default function ReelsPage() {
                     ))}
                   </div>
 
-                  <div className="flex justify-center gap-3 mt-6">
+                  <div className="flex justify-center gap-3 mt-6 flex-wrap">
                     <button
                       onClick={() => handleDownload(doneJobs[previewIndex].reel_id!, previewIndex)}
                       className="px-5 py-2.5 bg-secondary border border-border hover:bg-secondary/80 text-foreground font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
@@ -1131,6 +1175,16 @@ export default function ReelsPage() {
                       <Download className="w-4 h-4" />
                       Download This
                     </button>
+                    {doneJobs[previewIndex].srt_path && (
+                      <button
+                        onClick={() => triggerDownload(`/api/reels/download/${doneJobs[previewIndex].reel_id}/srt`, `${reelTitle.replace(/\s+/g, '_')}_${previewIndex + 1}.srt`)}
+                        className="px-4 py-2.5 bg-sky-700 hover:bg-sky-600 text-white font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"
+                        title="Download subtitle file (.srt)"
+                      >
+                        <Download className="w-4 h-4" />
+                        .srt
+                      </button>
+                    )}
                     <button
                       onClick={handleDownloadAll}
                       className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl flex items-center gap-2 transition-colors text-sm"

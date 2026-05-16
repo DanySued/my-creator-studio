@@ -20,6 +20,7 @@ export interface JobStatus {
   clip_count: number | null;
   created_at: string;
   completed_at: string | null;
+  srt_path: string | null;
 }
 
 export interface TextOverlayItem {
@@ -33,6 +34,7 @@ export interface TextOverlayItem {
 
 interface OverlayOptions {
   overlays?: TextOverlayItem[];
+  subtitlesEnabled?: boolean;
 }
 
 interface ReelGenerationContextValue {
@@ -139,6 +141,7 @@ export function ReelGenerationProvider({ children }: { children: ReactNode }) {
               title: count > 1 ? `${title} ${i + 1}` : title,
               songStartTime,
               overlays: overlay.overlays ?? [],
+              subtitlesEnabled: overlay.subtitlesEnabled ?? false,
             }),
           })
         );

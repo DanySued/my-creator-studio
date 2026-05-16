@@ -21,6 +21,8 @@ from services.video import (
     scale_to_instagram_reels,
     mix_audio,
     burn_text_overlays,
+    transcribe_audio_to_srt,
+    burn_subtitles,
     VideoProcessingError,
 )
 
@@ -336,23 +338,47 @@ def _phase2_render_reel(job_id: str, reel_id: str) -> None:
         job.save()
         JOBS[job_id]["progress"] = 95
 
-        final_path = os.path.join(reel_dir, "final.mp4")
+        overlays_path = os.path.join(reel_dir, "final.mp4")
         active_overlays = [ov for ov in request.overlays if ov.text.strip()]
         if active_overlays:
-            burn_text_overlays(audio_mixed_path, final_path, active_overlays)
+            burn_text_overlays(audio_mixed_path, overlays_path, active_overlays)
             os.remove(audio_mixed_path)
         else:
-            os.rename(audio_mixed_path, final_path)
+            os.rename(audio_mixed_path, overlays_path)
+
+        # Auto-subtitles: transcribe → burn → keep .srt (96–99%)
+        srt_path = None
+        if request.subtitles_enabled:
+            job.progress = 96
+            job.save()
+            JOBS[job_id]["progress"] = 96
+
+            # Whisper transcribes the video's audio track directly
+            srt_path = transcribe_audio_to_srt(overlays_path, reel_dir)
+
+            job.progress = 98
+            job.save()
+            JOBS[job_id]["progress"] = 98
+
+            # Burn the subtitles into a new file, then replace
+            subtitled_path = os.path.join(reel_dir, "final_subtitled.mp4")
+            burn_subtitles(overlays_path, srt_path, subtitled_path)
+            os.remove(overlays_path)
+            os.rename(subtitled_path, overlays_path)
+
+        final_path = overlays_path
 
         # Done (100%)
         job.progress = 100
         job.status = "done"
         job.completed_at = datetime.now()
         reel.output_path = final_path
+        if srt_path:
+            reel.srt_path = srt_path
         reel.save()
         job.save()
 
-        JOBS[job_id] = {"status": "done", "progress": 100, "error": None}
+        JOBS[job_id] = {"status": "done", "progress": 100, "error": None, "srt_path": srt_path}
 
     except Exception as e:
         job = ReelJob.get_by_id(job_id)
@@ -397,6 +423,12 @@ def get_job_status(job_id: str) -> dict:
             except Exception:
                 pass
         phase, phase_progress = _compute_phase(job.status, job.progress)
+        srt_path = None
+        if job.status == "done" and job.reel:
+            try:
+                srt_path = job.reel.srt_path or None
+            except Exception:
+                pass
         return {
             "job_id": job_id,
             "reel_id": job.reel.id if job.reel else None,
@@ -410,6 +442,7 @@ def get_job_status(job_id: str) -> dict:
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
             "reels_done": 1 if job.status == "done" else 0,
             "reels_total": 1,
+            "srt_path": srt_path,
         }
     except Exception:
         if job_id in JOBS:
@@ -430,6 +463,7 @@ def get_job_status(job_id: str) -> dict:
                 "completed_at": None,
                 "reels_done": 1 if mem_status == "done" else 0,
                 "reels_total": 1,
+                "srt_path": mem.get("srt_path"),
             }
         return {"status": "not_found", "error": "Job not found"}
 

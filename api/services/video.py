@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 class VideoProcessingError(Exception):
@@ -292,6 +292,106 @@ _FONT_NAME: dict[tuple[str, bool, bool], str] = {
 
 def _escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("'", "\\'").replace(":", "\\:")
+
+
+def _srt_timestamp(t: float) -> str:
+    """Convert seconds to SRT timestamp format: HH:MM:SS,mmm"""
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    ms = int(round((t % 1) * 1000))
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def transcribe_audio_to_srt(video_path: str, output_dir: str, model_size: str = "base") -> str:
+    """
+    Transcribe the audio track of a video using OpenAI Whisper and write a .srt subtitle file.
+
+    Whisper is loaded lazily so it doesn't slow startup. The 'base' model (~150 MB)
+    gives a good speed/accuracy balance for short reels.  Use 'small' for more accuracy
+    or 'tiny' for a faster result on CPU.
+
+    Args:
+        video_path:  Path to the source video (any format ffmpeg can read).
+        output_dir:  Directory where subtitles.srt will be written.
+        model_size:  Whisper model variant: tiny | base | small | medium | large.
+
+    Returns:
+        Absolute path to the generated .srt file.
+    """
+    try:
+        import whisper  # lazy import — not everyone has GPU/large RAM
+    except ImportError:
+        raise VideoProcessingError(
+            "openai-whisper is not installed. Add 'openai-whisper' to requirements.txt."
+        )
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        model = whisper.load_model(model_size)
+        result = model.transcribe(video_path, word_timestamps=False, verbose=False)
+    except Exception as e:
+        raise VideoProcessingError(f"Whisper transcription failed: {e}")
+
+    segments = result.get("segments", [])
+    srt_path = os.path.join(output_dir, "subtitles.srt")
+
+    with open(srt_path, "w", encoding="utf-8") as f:
+        for i, seg in enumerate(segments, 1):
+            start = _srt_timestamp(seg["start"])
+            end   = _srt_timestamp(seg["end"])
+            text  = seg["text"].strip()
+            f.write(f"{i}\n{start} --> {end}\n{text}\n\n")
+
+    return srt_path
+
+
+def burn_subtitles(input_path: str, srt_path: str, output_path: str) -> None:
+    """
+    Burn a .srt subtitle file into a video using FFmpeg's subtitles filter.
+
+    The subtitles are styled with a white font, black outline, and centered near
+    the bottom — matching the Instagram Reels aesthetic.
+
+    Args:
+        input_path:  Source video file.
+        srt_path:    Path to the .srt subtitle file produced by transcribe_audio_to_srt().
+        output_path: Output video with subtitles baked in.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # FFmpeg's subtitles filter needs forward slashes and escaped colons on all platforms
+    srt_escaped = srt_path.replace("\\", "/").replace(":", "\\:")
+
+    subtitle_style = (
+        "Fontname=DejaVu Sans,"
+        "FontSize=22,"
+        "PrimaryColour=&H00FFFFFF,"   # white text
+        "OutlineColour=&H00000000,"   # black outline
+        "Outline=2,"
+        "Shadow=1,"
+        "Alignment=2,"                # bottom-center
+        "MarginV=60"                  # push up from the bottom edge a bit
+    )
+
+    cmd = [
+        "ffmpeg", "-i", input_path,
+        "-vf", f"subtitles='{srt_escaped}':force_style='{subtitle_style}'",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "copy", "-y", output_path,
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise VideoProcessingError(f"ffmpeg subtitle burn failed: {result.stderr}")
+    except subprocess.TimeoutExpired:
+        raise VideoProcessingError("Subtitle burning timeout")
+    except VideoProcessingError:
+        raise
+    except Exception as e:
+        raise VideoProcessingError(f"Burn subtitles failed: {e}")
 
 
 def burn_text_overlays(input_path: str, output_path: str, overlays: list) -> None:
