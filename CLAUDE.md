@@ -1,136 +1,89 @@
-# CLAUDE.md
+# My Creator Studio — Claude Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What this project is
+An Instagram content-creation tool for a single user (Dany). Generates AI-powered carousels and video reels, manages Instagram accounts, and schedules posts. Deployed on Railway; auto-commits and pushes on every Claude session stop.
 
-## Project overview
+---
 
-My Creator Studio is a self-hosted Instagram content automation platform. It has two services:
+## Stack
+| Layer | Tech |
+|-------|------|
+| Backend | FastAPI (Python 3.12), Peewee ORM, PostgreSQL (Railway), APScheduler |
+| Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui |
+| AI | Google Gemini (`google-generativeai`) |
+| Media | MoviePy, Pillow, Pexels API, Instagrapi |
+| Infra | Railway (prod), Docker Compose (local) |
 
-- **`api/`** — Python FastAPI backend (port 8000), running via Uvicorn inside Docker
-- **`web/`** — Next.js 16 frontend (port 3000), also Dockerized
+---
 
-Both services are orchestrated with `docker-compose.yml` for local development and deployed to **Railway** in production. The database is SQLite locally (Peewee ORM, persisted in a Docker volume at `/data/studio.db`) and PostgreSQL on Railway (via `DATABASE_URL`). Generated media (reels, carousel slides) lives in `/media/`, mounted from `./media/` on the host.
+## Key paths
+```
+api/
+  main.py              # FastAPI app entry — registers all routers
+  routers/             # carousel.py, reels.py, instagram.py, automation.py, health.py
+  services/            # gemini.py, video.py, instagram.py, instagram_oauth.py, pexels.py, job_queue.py
+  models/
+    database.py        # Peewee DB init + model definitions
+    schemas.py         # Pydantic request/response schemas (source of truth for API contracts)
 
-## Running the project
+web/
+  app/
+    (dashboard)/       # All authenticated pages: carousel, reels, publish, accounts, automation, settings
+    api/               # Next.js API routes that proxy to FastAPI backend
+    login/             # Auth page
+    instagram/callback/ # OAuth callback
+  components/
+    carousel/          # Carousel editor UI components
+    reels/             # Reels editor UI components
+    layout/            # Sidebar, nav
+    ui/                # shadcn primitives
 
-**Full stack (recommended):**
-```bash
-# Copy and fill in .env before first run
-cp .env.example .env
-docker compose up --build
+docker-compose.yml     # Local dev: api:8000, web:3000
+.env                   # Secrets — never commit (already in .claudeignore)
 ```
 
-**Frontend only (local dev, hot-reload):**
+---
+
+## API conventions
+- Frontend calls `/api/<resource>` → Next.js route handler → proxies to FastAPI at `API_URL` (env var)
+- All FastAPI endpoints live under their router prefix: `/carousel`, `/reels`, `/instagram`, `/automation`, `/health`
+- Background jobs (reel generation) use APScheduler + job status polling via `GET /reels/job/{job_id}`
+- Media files (videos, audio, images) are stored on the server filesystem under `/media` (mounted volume)
+
+---
+
+## Data models summary
+- **Carousel**: id, title, theme, slides (JSON), created_at
+- **Reel**: id, title, keywords, duration, output_path, created_at
+- **Job**: id, reel_id, status (queued→processing→awaiting_clip_approval→done/failed), progress
+- **InstagramAccount**: id, username, session data, status
+- **ScheduledPost**: id, account_id, media_path, caption, scheduled_at, status
+- **ActivityLog**: id, account_id, action_type, message, created_at
+
+---
+
+## Local dev
 ```bash
-cd web
-npm install
-npm run dev       # http://localhost:3000
+docker compose up          # starts api (8000) + web (3000)
+docker compose up api      # backend only
 ```
 
-**Backend only (local dev):**
-```bash
-cd api
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
+---
 
-**Lint frontend:**
-```bash
-cd web && npm run lint
-```
+## Deploy
+- **Railway** hosts both services. Pushing to `master` triggers a deploy automatically.
+- A git hook auto-commits and pushes all changes at the end of every Claude session.
+- Do NOT manually commit during a session unless testing git history — the hook handles it.
 
-## Architecture: API proxy pattern
+---
 
-The Next.js frontend **never calls the Python API directly from the browser**. All API calls go through Next.js Route Handler catch-alls:
+## Important constraints
+- Single-user app — no multi-tenancy, no user auth system (simple password gate)
+- Instagrapi uses unofficial Instagram API — handle rate limits carefully, avoid aggressive automation
+- Reel generation is CPU-heavy (MoviePy) — runs in background jobs, never block the request thread
+- Next.js App Router only — no Pages Router patterns
 
-- `web/app/api/instagram/[...path]/route.ts` → proxies to `http://localhost:8000/instagram/**`
-- `web/app/api/carousel/`, `web/app/api/reels/`, `web/app/api/automation/` — same pattern
+---
 
-The server-side environment variable `API_URL` uses Docker's internal hostname (`http://api:8000`). In local dev without Docker it falls back to `http://localhost:8000`. The browser only ever talks to `localhost:3000/api/...`.
-
-## Architecture: Python API
-
-Routers in `api/routers/` are thin HTTP handlers. Business logic lives in `api/services/`:
-
-| Service | Responsibility |
-|---|---|
-| `gemini.py` | Google Gemini AI — carousel slide generation |
-| `pexels.py` | Pexels API — stock video search & download |
-| `video.py` | MoviePy/FFmpeg — trim, concat, scale, mix audio, burn text overlay |
-| `instagram.py` | instagrapi (private API) — post media, fetch comments/followers |
-| `instagram_oauth.py` | Official Meta OAuth 2.0 flow — token exchange, refresh |
-| `automation.py` | Comment auto-reply, follower snapshots, welcome DMs, growth actions |
-| `job_queue.py` | APScheduler — background reel generation jobs and scheduled posts |
-
-## Architecture: database models (Peewee ORM — SQLite locally / PostgreSQL on Railway)
-
-All models are in `api/models/database.py`. Key relationships:
-
-- `Carousel` → `CarouselSlide` (1:many)
-- `Reel` → `ReelJob` (1:many, job tracks async progress 0–100%)
-- `InstagramAccount` → `ScheduledPost`, `AutoReplyRule`, `AutoDMRule`, `FollowerSnapshot`, `DailyActionCount`
-
-`InstagramAccount` supports two auth methods stored on the same row:
-- `auth_method="password"` — instagrapi session JSON in `session_data`
-- `auth_method="oauth"` — Meta Graph API `access_token` + `instagram_user_id`
-
-## Architecture: Next.js frontend
-
-- **Route group `(dashboard)/`** — all authenticated pages share `layout.tsx` which wraps children with `<ReelGenerationProvider>` and renders `<GlobalReelStatus>` (floating reel job progress overlay)
-- **`lib/ReelGenerationContext.tsx`** — global React context that tracks reel generation job state; components poll the job status endpoint via this context rather than managing their own state
-- **UI components** — Radix UI primitives + shadcn/ui, styled with Tailwind CSS v4
-
-## Environment variables
-
-See `.env.example` for the full list. Required external services:
-
-| Variable | Service |
-|---|---|
-| `GEMINI_API_KEY` | Google AI Studio — carousel generation |
-| `PEXELS_API_KEY` | Pexels — stock footage for reels |
-| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Meta Developer app (OAuth) |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Upstash Redis — job caching, rate limits |
-| `QSTASH_TOKEN` / signing keys | Upstash QStash — durable scheduled posts |
-| `DATABASE_URL` | PostgreSQL connection string — set automatically by Railway via `${{Postgres.DATABASE_URL}}` |
-
-## Next.js version note
-
-This project uses **Next.js 16**, which has breaking changes from earlier versions. Before writing any Next.js code, check `web/node_modules/next/dist/docs/` for current API conventions. The `web/AGENTS.md` file (loaded as `web/CLAUDE.md`) contains this warning too.
-
-## Railway deployment
-
-Production runs on Railway (project: `my-creator-studio`, environment: `production`) with three services:
-
-| Service | Source | Public URL |
-|---|---|---|
-| `my-creator-studio` (API) | `api/` via `api/railway.toml` | `my-creator-studio-production.up.railway.app` |
-| `web` | `web/` via `web/railway.toml` | `web-production-77b4e.up.railway.app` |
-| `Postgres` | Railway managed image | internal only (`postgres.railway.internal:5432`) |
-
-Both app services deploy automatically on push to `master`. The API healthcheck path is `/health/backend`; the web healthcheck path is `/`. The web service reaches the API via Railway's private network using the `API_URL` environment variable (set to the API's internal Railway hostname).
-
-## Reel generation flow
-
-Generation is split into two distinct phases with a user review step in between.
-
-**Phase 1 — Clip preparation** (`status: processing`, `phase: 1`, `phase_progress: 0→100`)
-1. Client POSTs to `/api/reels/generate` → FastAPI creates `ReelJob` + queues APScheduler job → returns `job_id`
-2. Background job: search Pexels → download raw clips → trim each to `duration / clip_count` seconds in parallel
-3. Job pauses: `status` → `awaiting_clip_approval`, `phase_progress` → `100`; clip paths stored in `ReelJob.clip_paths`
-
-**Clip approval** (user interaction — polling stops here until the user acts)
-4. Client polls `/api/reels/job/[id]` → detects `awaiting_clip_approval` → renders clip review UI with inline video previews
-5. User may replace individual clips: `POST /api/reels/clips/{job_id}/replace/{index}` (fetches a fresh Pexels clip)
-6. User approves: `POST /api/reels/clips/{job_id}/approve` → triggers phase 2, polling resumes
-
-**Phase 2 — Rendering** (`status: processing`, `phase: 2`, `phase_progress: 0→100`)
-7. Concat approved clips → scale to 9:16 (1080×1920) → mix audio → burn text overlays → `status: done`
-8. Final MP4 at `MEDIA_DIR/generated/reels/{reel_id}/final.mp4`, served via FastAPI's `/media/` static mount
-
-**Progress shape returned by `get_job_status()` / `ReelJobResponse`:**
-- `progress` — raw global 0–100 (kept for internal reference)
-- `phase` — `1` or `2`
-- `phase_progress` — 0–100 within the current phase (what the UI progress bar and text display)
-- `_compute_phase()` in `services/job_queue.py` derives `phase` and `phase_progress` from `status` + `progress`
-
-> **FastAPI `response_model` gotcha**: any field added to `get_job_status()` must also be declared in `ReelJobResponse` (`api/models/schemas.py`) or FastAPI silently strips it before serialization. This applies to all response fields across all routers.
+## What NOT to read (already in .claudeignore)
+`web/node_modules/`, `web/.next/`, `**/__pycache__/`, `media/`, `*.db`, `.env`, `scripts/`
