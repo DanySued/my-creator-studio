@@ -1,0 +1,56 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import logging
+import os
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv(usecwd=False) or ".env")
+
+from routers import health, reels
+from models.database import init_db
+from services.job_queue import init_scheduler
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as exc:
+        logger.error("Database init failed: %s", exc)
+    try:
+        init_scheduler()
+        logger.info("Scheduler started")
+    except Exception as exc:
+        logger.error("Scheduler init failed: %s", exc)
+    yield
+
+
+app = FastAPI(title="Reels API", version="1.0.0", lifespan=lifespan)
+
+_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router, prefix="/health", tags=["health"])
+app.include_router(reels.router, prefix="/reels", tags=["reels"])
+
+MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+if os.path.isdir(MEDIA_DIR):
+    app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+else:
+    logger.warning("MEDIA_DIR %s not found — /media endpoint will not be available", MEDIA_DIR)
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "reels-api"}
