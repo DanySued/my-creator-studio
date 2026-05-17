@@ -95,6 +95,37 @@ async def delete_account(account_id: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/accounts/{account_id}/export-session")
+async def export_session(account_id: str):
+    """Return the raw Instagrapi session JSON for a given account (use locally to transfer to prod)."""
+    try:
+        account = InstagramAccount.get_by_id(account_id)
+    except InstagramAccount.DoesNotExist:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if not account.session_data:
+        raise HTTPException(status_code=400, detail="No session data — account has not logged in yet")
+    return {"username": account.username, "session_data": account.session_data}
+
+
+@router.post("/accounts/import-session")
+async def import_session(payload: dict):
+    """
+    Import an Instagrapi session exported from a local instance.
+    Accepts {username, session_data} and saves it to the DB after validating the session.
+    """
+    from services.instagram import import_session as _import_session
+    username = payload.get("username", "").strip()
+    session_data = payload.get("session_data", "").strip()
+    if not username or not session_data:
+        raise HTTPException(status_code=400, detail="username and session_data are required")
+    try:
+        return _import_session(username, session_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+
 # ── Upload media ──────────────────────────────────────────────────────────────
 
 @router.post("/upload-media")

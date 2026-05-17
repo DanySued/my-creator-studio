@@ -1,4 +1,5 @@
 """Instagram service using instagrapi for login, session management, and posting."""
+import hashlib
 import json
 import os
 import uuid
@@ -98,6 +99,36 @@ def _restore_client(account: InstagramAccount) -> Client:
 
 # ── Login flow ────────────────────────────────────────────────────────────────
 
+def _make_client(username: str) -> Client:
+    """
+    Build a Client with a stable device fingerprint derived from the username.
+
+    Instagram's bot-detection triggers heavily on new/random device UUIDs.
+    Hashing the username gives the same "device" on every attempt for the same
+    account, which looks far more like a real returning phone.
+    """
+    h = hashlib.md5(username.lower().encode()).hexdigest()
+
+    # Format UUIDs deterministically from the hash
+    def _to_uuid(s: str) -> str:
+        return f"{s[0:8]}-{s[8:12]}-4{s[13:16]}-a{s[17:20]}-{s[20:32]}"
+
+    device_id = f"android-{h[:16]}"
+    phone_id  = _to_uuid(h)
+    uuid_val  = _to_uuid(h[::-1])  # reversed hash → distinct second UUID
+
+    cl = Client()
+    cl.set_locale("en_US")
+    cl.set_timezone_offset(-18000)  # UTC-5 (US Eastern)
+    cl.delay_range = [1, 3]         # random 1-3 s pause between API calls
+    cl.set_settings({
+        "device_id": device_id,
+        "phone_id": phone_id,
+        "uuid": uuid_val,
+    })
+    return cl
+
+
 def login_account(username: str, password: str) -> dict:
     """
     Attempt an Instagram login.
@@ -108,7 +139,7 @@ def login_account(username: str, password: str) -> dict:
       {"status": "challenge_required", "pending_id": str, "challenge_type": "email"|"sms"}
     Raises ValueError on bad credentials or unexpected errors.
     """
-    cl = Client()
+    cl = _make_client(username)
     try:
         cl.login(username, password)
         return _save_session(cl, username)
@@ -155,7 +186,16 @@ def login_account(username: str, password: str) -> dict:
     except BadCredentials:
         raise ValueError("Incorrect username or password.")
     except Exception as e:
-        raise ValueError(f"Login failed: {str(e)}")
+        msg = str(e)
+        if "Expecting value" in msg or "JSONDecodeError" in msg:
+            raise ValueError(
+                "Instagram blocked the login request (empty response). "
+                "This usually means the server IP is flagged. "
+                "Workaround: log into instagram.com in a browser on this machine first, "
+                "then retry — or use 'Import session' to paste a session exported from a "
+                "local Docker instance where login succeeded."
+            )
+        raise ValueError(f"Login failed: {msg}")
 
 
 def complete_2fa(pending_id: str, code: str) -> dict:
@@ -199,6 +239,27 @@ def complete_challenge(pending_id: str, code: str) -> dict:
 def get_all_accounts() -> list:
     accounts = InstagramAccount.select().order_by(InstagramAccount.created_at.desc())
     return [_account_to_dict(a) for a in accounts]
+
+
+def import_session(username: str, session_data: str) -> dict:
+    """
+    Save a pre-existing Instagrapi session (exported from a local instance) into the DB.
+    Validates the session is still alive before saving.
+    """
+    try:
+        settings = json.loads(session_data)
+    except json.JSONDecodeError:
+        raise ValueError("session_data is not valid JSON")
+
+    cl = Client()
+    cl.set_settings(settings)
+
+    try:
+        cl.get_timeline_feed()
+    except Exception as e:
+        raise ValueError(f"Session validation failed — it may have expired: {str(e)}")
+
+    return _save_session(cl, username)
 
 
 def remove_account(account_id: str):

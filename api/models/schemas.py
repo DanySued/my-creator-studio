@@ -1,7 +1,7 @@
 """Pydantic schemas for request/response validation."""
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
 class SlideData(BaseModel):
@@ -57,13 +57,71 @@ class CarouselGenerateResponse(BaseModel):
     slides: List[SlideData]
 
 
+class TopicSlideData(BaseModel):
+    """A single slide spec produced from a topic, ready for rendering."""
+    slide_type: str   # "cover" | "content" | "end"
+    title: str
+    body: str = ""
+    pexels_query: str = ""
+
+
+class BulkCarouselRequest(BaseModel):
+    """Request to bulk-generate rendered carousels from a topic."""
+    topic: str
+    carousel_count: int = 3          # how many distinct carousels to produce
+    slides_per_carousel: int = 5     # slides per carousel (incl. cover + end)
+    tone: str = "casual"
+    top_label: str = ""              # optional label on every slide (e.g. "@handle")
+
+
+class BulkCarouselResponse(BaseModel):
+    """Response metadata after bulk generation (actual images are in the ZIP)."""
+    carousel_count: int
+    slides_per_carousel: int
+    topic: str
+
+
+# === CarouselForge-style slide system ===
+
+class CarouselSlideItem(BaseModel):
+    """A single slide in the new text-paste carousel system."""
+    type: str           # "cover" | "content" | "cta"
+    number_label: str   # "01", "02", ...
+    title: str
+    body: str
+
+
+class CarouselFromTextRequest(BaseModel):
+    """Generate a carousel from pasted raw text."""
+    raw_text: str
+    theme: str = "midnight"
+    handle: str = ""
+    font: str = "inter"
+    size: str = "1080x1350"
+    slide_count: Optional[int] = None   # None = let Gemini decide
+
+
+class CarouselFromTextResponse(BaseModel):
+    carousel_id: str
+    slides: List[CarouselSlideItem]
+
+
+class CarouselRenderRequest(BaseModel):
+    """Render themed PNG slides and return as ZIP."""
+    carousel_id: Optional[str] = None
+    slides: List[CarouselSlideItem]
+    theme: str = "midnight"
+    handle: str = ""
+    size: str = "1080x1350"
+
+
 # === Reels Schemas ===
 
 class TextOverlayItem(BaseModel):
     """A single text layer to burn onto the video."""
     text: str
-    x: float = 50.0       # % from left (0–100), text centered at this point
-    y: float = 82.0       # % from top  (0–100), text centered at this point
+    x: float = 50.0       # % from left (0-100), text centered at this point
+    y: float = 82.0       # % from top  (0-100), text centered at this point
     font: str = "sans"    # "sans" | "serif" | "mono"
     bold: bool = False
     italic: bool = False
@@ -78,7 +136,7 @@ class ReelGenerateRequest(BaseModel):
     song_start_time: int = 0
     overlays: List[TextOverlayItem] = []  # empty list = no text
     count: int = 1
-    subtitles_enabled: bool = False  # auto-transcribe audio → burn subtitles + export .srt
+    subtitles_enabled: bool = False  # auto-transcribe audio -> burn subtitles + export .srt
 
 
 class ReelJobResponse(BaseModel):
@@ -125,7 +183,7 @@ class AudioListResponse(BaseModel):
     audio_files: List[AudioUploadResponse]
 
 
-# ── Phase 4 — Instagram / Publish ────────────────────────────────────────────
+# == Phase 4 - Instagram / Publish ==
 
 class LoginRequest(BaseModel):
     username: str

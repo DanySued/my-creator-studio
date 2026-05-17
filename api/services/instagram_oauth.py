@@ -67,14 +67,24 @@ def _account_to_dict(account: InstagramAccount) -> dict:
 # ── OAuth service ──────────────────────────────────────────────────────────────
 
 class InstagramOAuthService:
-    def __init__(self):
-        self.app_id = os.getenv("INSTAGRAM_APP_ID")
-        self.app_secret = os.getenv("INSTAGRAM_APP_SECRET")
-        self.redirect_uri = os.getenv(
+    @property
+    def app_id(self) -> Optional[str]:
+        return os.getenv("INSTAGRAM_APP_ID")
+
+    @property
+    def app_secret(self) -> Optional[str]:
+        return os.getenv("INSTAGRAM_APP_SECRET")
+
+    @property
+    def redirect_uri(self) -> str:
+        return os.getenv(
             "INSTAGRAM_REDIRECT_URI",
             "http://localhost:8000/instagram/oauth/callback",
         )
-        self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+    @property
+    def frontend_url(self) -> str:
+        return os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     def is_configured(self) -> bool:
         return bool(self.app_id and self.app_secret)

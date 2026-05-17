@@ -14,16 +14,19 @@ services:
     restart: unless-stopped
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      target: deps
     ports:
       - "3000:3000"
+    env_file: .env
     volumes:
       - ./web:/app
       - /app/node_modules
-      - /app/.next
     environment:
       - API_URL=http://api:8000          # server-side only (Docker internal)
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    command: npm run dev
     depends_on:
       - api
     restart: unless-stopped

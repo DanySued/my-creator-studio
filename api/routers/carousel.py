@@ -1,4 +1,5 @@
 """Carousel generation API endpoints."""
+import asyncio
 import os
 import uuid
 import json
@@ -10,46 +11,52 @@ from fastapi.responses import StreamingResponse
 import zipfile
 
 from models.schemas import (
+    BulkCarouselRequest,
+    CarouselFromTextRequest,
+    CarouselFromTextResponse,
     CarouselGenerateRequest,
     CarouselExportRequest,
     CarouselGenerateResponse,
     CarouselHistoryResponse,
+    CarouselRenderRequest,
     CarouselResponse,
     PexelsPhotoSearchResponse,
     SlideData,
 )
 from models.database import Carousel, CarouselSlide
-from services.gemini import generate_carousel_slides
+from services.gemini import format_text_as_carousel_slides, generate_carousel_slides, generate_slides_from_topic
 from services.pexels import search_photos
+from services.image_renderer import SlideSpec, render_carousel, render_carousel_themed
 
 router = APIRouter()
 
-# Media directory for storing generated files
 MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
+
+
+def _save_carousel_to_db(carousel_id: str, title: str, theme: str, slide_pairs: list[tuple[str, str]]) -> None:
+    """Persist a carousel and its slides. slide_pairs = [(title, content), ...]"""
+    carousel = Carousel.create(id=carousel_id, title=title, theme=theme, slide_count=len(slide_pairs))
+    for i, (slide_title, slide_content) in enumerate(slide_pairs):
+        CarouselSlide.create(
+            id=f"{carousel_id}-slide-{i}",
+            carousel=carousel,
+            position=i,
+            title=slide_title,
+            content=slide_content,
+            image_path="",
+        )
 CAROUSEL_DIR = os.path.join(MEDIA_DIR, "generated")
 os.makedirs(CAROUSEL_DIR, exist_ok=True)
 
 
 @router.post("/generate", response_model=CarouselGenerateResponse)
 async def generate_carousel(request: CarouselGenerateRequest):
-    """
-    Generate carousel slides from document content using Gemini AI.
-
-    - **content**: Extracted text from PDF/DOCX/TXT
-    - **slide_count**: Number of slides to generate (default: 5)
-    - **theme**: Carousel theme (default: midnight)
-    - **title**: Carousel title (default: Generated Carousel)
-
-    Returns slide data ready for preview/export.
-    """
+    """Generate carousel slides from document content using Gemini AI."""
     if not request.content or len(request.content.strip()) < 10:
         raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
-
     if request.slide_count < 1 or request.slide_count > 20:
         raise HTTPException(status_code=400, detail="Slide count must be between 1 and 20")
-
     try:
-        # Generate slides using Gemini
         slides = generate_carousel_slides(
             content=request.content,
             slide_count=request.slide_count,
@@ -59,63 +66,30 @@ async def generate_carousel(request: CarouselGenerateRequest):
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gemini API error: {str(e)[:200]}"
-        )
+        raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)[:200]}")
 
-    # Create carousel record
     carousel_id = str(uuid.uuid4())
     try:
-        carousel = Carousel.create(
-            id=carousel_id,
-            title=request.title,
-            theme=request.theme,
-            slide_count=len(slides),
-        )
+        _save_carousel_to_db(carousel_id, request.title, request.theme, [(s.title, s.content) for s in slides])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Store slides in database
-    for i, slide in enumerate(slides):
-        try:
-            CarouselSlide.create(
-                id=f"{carousel_id}-slide-{i}",
-                carousel=carousel,
-                position=i,
-                title=slide.title,
-                content=slide.content,
-                image_path="",
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to store slide: {str(e)}")
-
-    return CarouselGenerateResponse(
-        carousel_id=carousel_id,
-        slides=slides,
-    )
+    return CarouselGenerateResponse(carousel_id=carousel_id, slides=slides)
 
 
 @router.post("/export")
 async def export_carousel(request: CarouselExportRequest):
-    """
-    Export carousel slide data as a ZIP file (JSON manifest + per-slide JSON).
-    PNG rendering is handled client-side by html-to-image.
-    """
+    """Export carousel slide data as a ZIP file."""
     if not request.carousel_id:
         raise HTTPException(status_code=400, detail="carousel_id required")
-
     if len(request.slides) == 0:
         raise HTTPException(status_code=400, detail="No slides provided")
-
     try:
         carousel = Carousel.get_by_id(request.carousel_id)
     except Exception:
         raise HTTPException(status_code=404, detail="Carousel not found")
 
-    # Create ZIP in memory
     zip_buffer = BytesIO()
-
     try:
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             manifest = {
@@ -126,19 +100,12 @@ async def export_carousel(request: CarouselExportRequest):
                 "created_at": carousel.created_at.isoformat(),
             }
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
-
             for i, slide in enumerate(request.slides):
-                slide_json = {
-                    "position": i,
-                    "title": slide.title,
-                    "content": slide.content,
-                }
+                slide_json = {"position": i, "title": slide.title, "content": slide.content}
                 zf.writestr(f"slide_{str(i + 1).zfill(2)}.json", json.dumps(slide_json, indent=2))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
-    # Return ZIP file
     zip_buffer.seek(0)
     safe_name = carousel.title.replace(" ", "_").replace("/", "_")
     return StreamingResponse(
@@ -149,7 +116,7 @@ async def export_carousel(request: CarouselExportRequest):
 
 
 @router.get("/pexels-backgrounds", response_model=PexelsPhotoSearchResponse)
-async def pexels_background_search(q: str = Query(..., min_length=1, description="Search query")):
+async def pexels_background_search(q: str = Query(..., min_length=1)):
     """Search Pexels for square photos to use as slide backgrounds."""
     try:
         photos = await search_photos(query=q, per_page=20)
@@ -160,11 +127,140 @@ async def pexels_background_search(q: str = Query(..., min_length=1, description
         raise HTTPException(status_code=500, detail=f"Pexels search failed: {str(e)[:200]}")
 
 
+@router.post("/bulk")
+async def bulk_generate_carousel(request: BulkCarouselRequest):
+    """Bulk-generate rendered carousel PNGs from a topic.
+
+    Calls Gemini for slide content, fetches Pexels backgrounds, renders
+    1080x1350 PNGs with Pillow and returns a ZIP as carousel_01/slide_01.png.
+    """
+    if request.carousel_count < 1 or request.carousel_count > 10:
+        raise HTTPException(status_code=400, detail="carousel_count must be between 1 and 10")
+    if request.slides_per_carousel < 3 or request.slides_per_carousel > 10:
+        raise HTTPException(status_code=400, detail="slides_per_carousel must be between 3 and 10")
+
+    zip_buffer = BytesIO()
+    try:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for carousel_idx in range(request.carousel_count):
+
+                # 1. Gemini generates slide content
+                try:
+                    topic_slides = generate_slides_from_topic(
+                        topic=request.topic,
+                        slide_count=request.slides_per_carousel,
+                        tone=request.tone,
+                    )
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)[:200]}")
+
+                # 2. Fetch a Pexels photo per slide
+                specs = []
+                for ts in topic_slides:
+                    try:
+                        photos = await search_photos(query=ts.pexels_query, per_page=5)
+                        photo = photos[carousel_idx % len(photos)]
+                        bg_url = photo["full"]
+                    except Exception:
+                        try:
+                            photos = await search_photos(query=request.topic, per_page=10)
+                            photo = photos[carousel_idx % len(photos)]
+                            bg_url = photo["full"]
+                        except Exception as e:
+                            raise HTTPException(status_code=500, detail=f"Pexels error: {str(e)[:200]}")
+                    specs.append(SlideSpec(
+                        slide_type=ts.slide_type,
+                        title=ts.title,
+                        body=ts.body,
+                        bg_image_url=bg_url,
+                    ))
+
+                # 3. Render with Pillow
+                try:
+                    png_list = render_carousel(specs, top_label=request.top_label)
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Render error: {str(e)[:200]}")
+
+                # 4. Add to ZIP
+                folder = f"carousel_{str(carousel_idx + 1).zfill(2)}"
+                for slide_idx, png_bytes in enumerate(png_list):
+                    zf.writestr(f"{folder}/slide_{str(slide_idx + 1).zfill(2)}.png", png_bytes)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk generation failed: {str(e)[:200]}")
+
+    zip_buffer.seek(0)
+    safe_topic = request.topic[:40].replace(" ", "_").replace("/", "_")
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="carousels_{safe_topic}.zip"'},
+    )
+
+
+@router.post("/from-text", response_model=CarouselFromTextResponse)
+async def generate_from_text(request: CarouselFromTextRequest):
+    """Generate carousel slides from pasted raw text using Gemini AI."""
+    if not request.raw_text or len(request.raw_text.strip()) < 20:
+        raise HTTPException(status_code=400, detail="Text must be at least 20 characters")
+    try:
+        slides = format_text_as_carousel_slides(
+            raw_text=request.raw_text,
+            slide_count=request.slide_count,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)[:200]}")
+
+    carousel_id = str(uuid.uuid4())
+    try:
+        _save_carousel_to_db(
+            carousel_id,
+            slides[0].title if slides else "Carousel",
+            request.theme,
+            [(s.title, s.body) for s in slides],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    return CarouselFromTextResponse(carousel_id=carousel_id, slides=slides)
+
+
+@router.post("/render-png")
+async def render_carousel_png(request: CarouselRenderRequest):
+    """Render carousel slides as themed PNG images and return as ZIP."""
+    if not request.slides:
+        raise HTTPException(status_code=400, detail="No slides provided")
+    try:
+        png_list = await asyncio.to_thread(
+            lambda: render_carousel_themed(
+                slides=request.slides,
+                theme=request.theme,
+                top_label=request.handle,
+            )
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Render error: {str(e)[:200]}")
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for i, png_bytes in enumerate(png_list):
+            zf.writestr(f"slide_{str(i + 1).zfill(2)}.png", png_bytes)
+
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="carousel.zip"'},
+    )
+
+
 @router.get("/history", response_model=CarouselHistoryResponse)
 async def get_carousel_history():
-    """
-    List all past carousels in order of creation (newest first).
-    """
+    """List all past carousels in order of creation (newest first)."""
     try:
         carousels = Carousel.select().order_by(Carousel.created_at.desc())
         return CarouselHistoryResponse(

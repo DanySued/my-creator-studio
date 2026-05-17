@@ -14,12 +14,13 @@ import {
   EyeOff,
   ShieldCheck,
   ExternalLink,
+  Upload,
 } from "lucide-react";
 import { Account } from "@/lib/types";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { AccountAvatar } from "@/components/ui/account-avatar";
 
-type ModalStep = "form" | "2fa" | "challenge";
+type ModalStep = "form" | "2fa" | "challenge" | "import";
 
 const fmt = (n: number) =>
   n >= 1_000_000
@@ -297,9 +298,34 @@ function ConnectModal({
     }
   };
 
+  const [importUsername, setImportUsername] = useState("");
+  const [importSession, setImportSession] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+
+  const handleImport = async () => {
+    if (!importUsername.trim() || !importSession.trim()) return;
+    setImportLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/instagram/accounts/import-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: importUsername.trim(), session_data: importSession.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? "Import failed");
+      if (data.status === "connected") onConnected(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const stepTitle =
     step === "form" ? "Connect Instagram" :
     step === "2fa" ? "Two-Factor Auth" :
+    step === "import" ? "Import Session" :
     "Verify Identity";
 
   return (
@@ -420,6 +446,15 @@ function ConnectModal({
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loading ? "Connecting…" : "Connect"}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setStep("import"); setError(""); }}
+                  className="w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Upload className="w-3 h-3" />
+                  Import session from local instance
+                </button>
               </motion.form>
             )}
 
@@ -460,6 +495,59 @@ function ConnectModal({
                 </button>
                 <button
                   onClick={() => { setStep("form"); setCode(""); setError(""); }}
+                  className="w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ← Back to login
+                </button>
+              </motion.div>
+            )}
+
+            {step === "import" && (
+              <motion.div
+                key="import"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                className="space-y-4"
+              >
+                <p className="text-xs text-muted-foreground">
+                  Login locally (Docker), then call{" "}
+                  <code className="px-1 py-0.5 rounded bg-secondary text-foreground font-mono text-[11px]">
+                    GET /instagram/accounts/&#123;id&#125;/export-session
+                  </code>{" "}
+                  on localhost:8000 and paste the result below.
+                </p>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Username</label>
+                  <input
+                    type="text"
+                    value={importUsername}
+                    onChange={(e) => setImportUsername(e.target.value)}
+                    placeholder="@yourhandle"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Session JSON</label>
+                  <textarea
+                    value={importSession}
+                    onChange={(e) => setImportSession(e.target.value)}
+                    placeholder='{"uuids": {...}, "cookies": {...}, ...}'
+                    rows={5}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-secondary border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono resize-none"
+                  />
+                </div>
+                {error && <ErrorBanner message={error} />}
+                <button
+                  onClick={handleImport}
+                  disabled={importLoading || !importUsername || !importSession}
+                  className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {importLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {importLoading ? "Importing…" : "Import & Connect"}
+                </button>
+                <button
+                  onClick={() => { setStep("form"); setError(""); }}
                   className="w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   ← Back to login
