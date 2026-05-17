@@ -1,7 +1,7 @@
 # My Creator Studio — Claude Context
 
 ## What this project is
-An Instagram content-creation tool for a single user (Dany). Generates AI-powered carousels and video reels, manages Instagram accounts, and schedules posts. Deployed on Railway; auto-commits and pushes on every Claude session stop.
+An Instagram content-creation tool for a single user (Dany). Generates AI-powered carousels and video reels, manages Instagram accounts, and schedules posts. Deployed on Railway; there is no local dev — all changes are made here, committed, and pushed to GitHub so Railway auto-deploys.
 
 ---
 
@@ -12,7 +12,7 @@ An Instagram content-creation tool for a single user (Dany). Generates AI-powere
 | Frontend | Next.js (App Router), TypeScript, Tailwind, shadcn/ui |
 | AI | Google Gemini (`google-generativeai`) |
 | Media | MoviePy, Pillow, Pexels API, Instagrapi |
-| Infra | Railway (prod), Docker Compose (local) |
+| Infra | Railway (prod + deploy target) — no local dev |
 
 ---
 
@@ -38,7 +38,7 @@ web/
     layout/            # Sidebar, nav
     ui/                # shadcn primitives
 
-docker-compose.yml     # Local dev: api:8000, web:3000
+docker-compose.yml     # Legacy local dev — not used, kept for reference only
 .env                   # Secrets — never commit (already in .claudeignore)
 ```
 
@@ -62,18 +62,23 @@ docker-compose.yml     # Local dev: api:8000, web:3000
 
 ---
 
-## Local dev
-```bash
-docker compose up          # starts api (8000) + web (3000)
-docker compose up api      # backend only
-```
+## Production URLs
+| Service | URL |
+|---------|-----|
+| Web (Next.js) | https://web-production-77b4e.up.railway.app |
+| API (FastAPI) | https://my-creator-studio-production.up.railway.app |
+
+These are the live sites. There is no local dev environment — test changes by verifying them on these URLs after deploy.
 
 ---
 
-## Deploy
-- **Railway** hosts both services. Pushing to `master` triggers a deploy automatically.
-- A git hook auto-commits and pushes all changes at the end of every Claude session.
-- Do NOT manually commit during a session unless testing git history — the hook handles it.
+## Development workflow
+1. Claude edits files in this repo.
+2. After each logical change is complete, Claude commits and pushes to `master`.
+3. Railway auto-deploys both `api` and `web` services within ~2 minutes of a push.
+4. Dany verifies the change on the production URLs above.
+
+**Commit after each logical unit of work** — don't batch everything to session end. Each push triggers Railway to rebuild and redeploy, so Dany sees the change while the session is still active.
 
 ---
 
