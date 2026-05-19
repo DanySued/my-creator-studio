@@ -55,6 +55,11 @@
   /* Force dark mode always */
   color-scheme: dark;
 
+  /* Motion duration tokens */
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 400ms;
+
   --background: oklch(0.10 0.005 260);
   --foreground: oklch(0.95 0.005 260);
   --card: oklch(0.16 0.007 260);
@@ -124,6 +129,21 @@
   100% { transform: translateX(300%); }
 }
 
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes border-pulse {
+  0%, 100% { border-color: oklch(0.65 0.22 292 / 30%); }
+  50% { border-color: oklch(0.65 0.22 292 / 70%); }
+}
+
 @layer utilities {
   .gradient-text {
     @apply bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent;
@@ -133,5 +153,29 @@
   }
   .glow {
     box-shadow: 0 0 40px var(--shadow-primary);
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background;
+  }
+  .border-pulse {
+    animation: border-pulse 1.2s ease-in-out infinite;
+  }
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

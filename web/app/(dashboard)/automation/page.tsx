@@ -153,14 +153,19 @@ export default function AutomationPage() {
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab === id
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  tab === id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {label}
+                {tab === id && (
+                  <motion.span
+                    layoutId="automation-tab-pill"
+                    className="absolute inset-0 rounded-lg bg-card shadow-sm"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <Icon className="relative z-10 w-4 h-4" />
+                <span className="relative z-10">{label}</span>
               </button>
             ))}
           </div>
@@ -251,7 +256,7 @@ function TabPanel({ children }: { children: React.ReactNode }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.15 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
     </motion.div>
@@ -929,13 +934,15 @@ function GrowthActionsTab({ accountId }: { accountId: string }) {
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
+                  <motion.div
+                    className={`h-full rounded-full ${
                       pct(counts.counts[at], counts.limits[at]) > 80
                         ? "bg-rose-500"
                         : "bg-violet-500"
                     }`}
-                    style={{ width: `${pct(counts.counts[at], counts.limits[at])}%` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct(counts.counts[at], counts.limits[at])}%` }}
+                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
                   />
                 </div>
               </div>
@@ -1206,7 +1213,11 @@ function ActionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="p-4 rounded-xl border border-border bg-secondary/20 space-y-3">
+    <motion.div
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.99 }}
+      className="p-4 rounded-xl border border-border bg-secondary/20 space-y-3"
+    >
       <div className="flex items-center gap-2 mb-1">
         {icon}
       </div>
@@ -1227,7 +1238,7 @@ function ActionCard({
           )}
         </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

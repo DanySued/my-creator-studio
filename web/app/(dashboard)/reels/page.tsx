@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import {
   Download,
   Music,
@@ -490,13 +491,21 @@ export default function ReelsPage() {
       {!isActive && (
         <div className="space-y-6">
           {/* Keywords */}
-          <section>
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0, ease: [0.16, 1, 0.3, 1] }}
+          >
             <h2 className="text-sm font-semibold text-foreground mb-3">1. Keywords</h2>
             <KeywordEngine keywords={keywords} onKeywordsChange={setKeywords} />
-          </section>
+          </motion.section>
 
           {/* Audio */}
-          <section>
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.07, ease: [0.16, 1, 0.3, 1] }}
+          >
             <h2 className="text-sm font-semibold text-foreground mb-3">2. Audio Track</h2>
 
             {audioError && <ErrorBanner message={audioError} className="mb-3" />}
@@ -654,10 +663,14 @@ export default function ReelsPage() {
                 />
               </label>
             </div>
-          </section>
+          </motion.section>
 
           {/* Settings */}
-          <section>
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          >
             <h2 className="text-sm font-semibold text-foreground mb-3">3. Settings</h2>
             <div className="space-y-4 bg-secondary/50 rounded-xl border border-border p-5">
               <div>
@@ -752,10 +765,14 @@ export default function ReelsPage() {
                 </div>
               )}
             </div>
-          </section>
+          </motion.section>
 
           {/* Text Overlay */}
-          <section>
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.21, ease: [0.16, 1, 0.3, 1] }}
+          >
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">4. Text Overlay</h2>
               <button
@@ -877,7 +894,7 @@ export default function ReelsPage() {
                 No text will be added to the reel.
               </p>
             )}
-          </section>
+          </motion.section>
 
           {(validationError || error) && (
             <ErrorBanner message={validationError || error!} />
@@ -902,7 +919,8 @@ export default function ReelsPage() {
             </button>
           </div>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.97 }}
             onClick={handleGenerate}
             disabled={isGenerating || !keywords.length || !selectedAudioId}
             className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
@@ -915,7 +933,7 @@ export default function ReelsPage() {
             ) : (
               'Generate Reel'
             )}
-          </button>
+          </motion.button>
         </div>
       )}
 
@@ -1107,13 +1125,16 @@ export default function ReelsPage() {
                 <div className="flex flex-col items-center gap-5">
                   <VideoPreview reelId={doneJobs[0].reel_id!} />
                   <div className="flex items-center gap-3">
-                    <button
+                    <motion.button
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                       onClick={() => handleDownload(doneJobs[0].reel_id!)}
                       className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-lg"
                     >
                       <Download className="w-4 h-4" />
                       Download Reel
-                    </button>
+                    </motion.button>
                     {doneJobs[0].srt_path && (
                       <button
                         onClick={() => triggerDownload(`/api/reels/download/${doneJobs[0].reel_id}/srt`, `${reelTitle.replace(/\s+/g, '_')}.srt`)}

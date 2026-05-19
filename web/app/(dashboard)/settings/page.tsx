@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   CheckCircle2,
   XCircle,
@@ -73,17 +74,49 @@ const INTEGRATIONS: IntegrationConfig[] = [
 ];
 
 function StatusIcon({ status }: { status: Status }) {
-  if (status === "checking") return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
-  if (status === "ok") return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
-  if (status === "error") return <XCircle className="w-4 h-4 text-destructive" />;
-  return <div className="w-4 h-4 rounded-full border-2 border-border" />;
+  const icons = {
+    checking: <Loader2 className="w-4 h-4 text-primary animate-spin" />,
+    ok: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+    error: <XCircle className="w-4 h-4 text-destructive" />,
+    idle: <div className="w-4 h-4 rounded-full border-2 border-border" />,
+  };
+  return (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={status}
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.7 }}
+        transition={{ duration: 0.15 }}
+        className="flex items-center"
+      >
+        {icons[status]}
+      </motion.span>
+    </AnimatePresence>
+  );
 }
 
 function StatusBadge({ status }: { status: Status }) {
-  if (status === "checking") return <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">Checking…</Badge>;
-  if (status === "ok") return <Badge variant="outline" className="border-emerald-400/30 text-emerald-400 text-[10px]">Connected</Badge>;
-  if (status === "error") return <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px]">Error</Badge>;
-  return <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">Not configured</Badge>;
+  const badges = {
+    checking: <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">Checking…</Badge>,
+    ok: <Badge variant="outline" className="border-emerald-400/30 text-emerald-400 text-[10px]">Connected</Badge>,
+    error: <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px]">Error</Badge>,
+    idle: <Badge variant="outline" className="border-border text-muted-foreground text-[10px]">Not configured</Badge>,
+  };
+  return (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={status}
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.85 }}
+        transition={{ duration: 0.15 }}
+        className="flex items-center"
+      >
+        {badges[status]}
+      </motion.span>
+    </AnimatePresence>
+  );
 }
 
 function IntegrationCard({ config }: { config: IntegrationConfig }) {
@@ -152,7 +185,7 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={config.placeholder}
-            className="w-full h-9 px-3 pr-9 text-xs rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+            className="w-full h-9 px-3 pr-9 text-xs rounded-lg bg-input border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus-ring font-mono"
           />
           <button
             onClick={() => setShowKey(!showKey)}
@@ -161,7 +194,8 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
             {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           </button>
         </div>
-        <button
+        <motion.button
+          whileTap={{ scale: 0.96 }}
           onClick={testConnection}
           disabled={status === "checking"}
           className={cn(
@@ -170,7 +204,7 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
           )}
         >
           {status === "checking" ? "Testing…" : "Test"}
-        </button>
+        </motion.button>
       </div>
 
       {errorMsg && (
@@ -195,34 +229,44 @@ function IntegrationCard({ config }: { config: IntegrationConfig }) {
         {status === "error" ? "Troubleshooting guide" : "Setup guide"}
       </button>
 
-      {showGuide && (
-        <div className="mt-3 pt-3 border-t border-border space-y-4">
-          <div>
-            <p className="text-xs font-medium text-foreground mb-2">How to get your API key</p>
-            <ol className="space-y-1.5">
-              {config.setupSteps.map((step, i) => (
-                <li key={i} className="flex gap-2 text-xs text-muted-foreground">
-                  <span className="shrink-0 text-primary font-medium">{i + 1}.</span>
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
-          {status === "error" && (
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Common issues</p>
-              <ul className="space-y-1.5">
-                {config.troubleshoot.map((tip, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-muted-foreground">
-                    <span className="shrink-0 text-amber-400">→</span>
-                    {tip}
-                  </li>
-                ))}
-              </ul>
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 pt-3 border-t border-border space-y-4">
+              <div>
+                <p className="text-xs font-medium text-foreground mb-2">How to get your API key</p>
+                <ol className="space-y-1.5">
+                  {config.setupSteps.map((step, i) => (
+                    <li key={i} className="flex gap-2 text-xs text-muted-foreground">
+                      <span className="shrink-0 text-primary font-medium">{i + 1}.</span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              {status === "error" && (
+                <div>
+                  <p className="text-xs font-medium text-foreground mb-2">Common issues</p>
+                  <ul className="space-y-1.5">
+                    {config.troubleshoot.map((tip, i) => (
+                      <li key={i} className="flex gap-2 text-xs text-muted-foreground">
+                        <span className="shrink-0 text-amber-400">→</span>
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }

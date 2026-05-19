@@ -1,5 +1,6 @@
 'use client'
 
+import { motion } from 'motion/react'
 import { CarouselTheme } from '@/lib/carouselThemes'
 
 export type SlideType = 'cover' | 'content' | 'cta'
@@ -17,9 +18,10 @@ interface SlideCardProps {
   theme: CarouselTheme
   handle?: string
   scale?: number
+  onClick?: () => void
 }
 
-export function SlideCard({ slide, theme, handle, scale = 0.25 }: SlideCardProps) {
+export function SlideCard({ slide, theme, handle, scale = 0.25, onClick }: SlideCardProps) {
   const W = 1080
   const H = 1350
   const w = W * scale
@@ -35,7 +37,11 @@ export function SlideCard({ slide, theme, handle, scale = 0.25 }: SlideCardProps
   const sepTop = isCover ? h * 0.59 : h * 0.50
 
   return (
-    <div
+    <motion.div
+      onClick={onClick}
+      whileHover={onClick ? { scale: 1.02 } : undefined}
+      whileTap={onClick ? { scale: 0.98 } : undefined}
+      transition={onClick ? { type: 'spring', stiffness: 400, damping: 25 } : undefined}
       style={{
         width: w,
         height: h,
@@ -46,6 +52,7 @@ export function SlideCard({ slide, theme, handle, scale = 0.25 }: SlideCardProps
         flexShrink: 0,
         userSelect: 'none',
         fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+        cursor: onClick ? 'pointer' : 'default',
       }}
     >
       {/* Number label */}
@@ -135,6 +142,6 @@ export function SlideCard({ slide, theme, handle, scale = 0.25 }: SlideCardProps
           {slide.numberLabel}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

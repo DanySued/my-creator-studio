@@ -217,9 +217,11 @@ export default function PublishPage() {
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
                 {accounts.map((acc) => (
-                  <button
+                  <motion.button
                     key={acc.id}
                     onClick={() => setSelectedAccountId(acc.id)}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
                     className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                       selectedAccountId === acc.id
                         ? "border-primary bg-primary/5 ring-1 ring-primary/20"
@@ -236,7 +238,7 @@ export default function PublishPage() {
                     {selectedAccountId === acc.id && (
                       <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                     )}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             )}
@@ -244,7 +246,7 @@ export default function PublishPage() {
 
           <Section title="Media">
             <div
-              className="relative flex items-center gap-3 p-3 rounded-xl border border-dashed border-border hover:border-primary/40 transition-colors cursor-pointer mb-3 group"
+              className={`relative flex items-center gap-3 p-3 rounded-xl border border-dashed transition-colors cursor-pointer mb-3 group ${uploading ? "border-pulse border-primary/40" : "border-border hover:border-primary/40"}`}
               onClick={() => fileRef.current?.click()}
             >
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -270,9 +272,11 @@ export default function PublishPage() {
             {mediaList.length > 0 && (
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {mediaList.map((item) => (
-                  <button
+                  <motion.button
                     key={item.id}
                     onClick={() => { setSelectedMedia(item); setUploadedPath(null); }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
                     className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                       selectedMedia?.id === item.id
                         ? "border-primary bg-primary/5 ring-1 ring-primary/20"
@@ -291,7 +295,7 @@ export default function PublishPage() {
                     {selectedMedia?.id === item.id && (
                       <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                     )}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             )}
@@ -313,7 +317,7 @@ export default function PublishPage() {
               placeholder="Write a caption… #hashtags work too"
               className="w-full px-3.5 py-3 rounded-xl bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
             />
-            <p className={`text-xs mt-1 text-right ${caption.length > CAPTION_LIMIT - 100 ? "text-amber-400" : "text-muted-foreground"}`}>
+            <p className={`text-xs mt-1 text-right tabular-nums transition-colors duration-300 ${caption.length > CAPTION_LIMIT - 100 ? "text-amber-400" : "text-muted-foreground"}`}>
               {caption.length} / {CAPTION_LIMIT}
             </p>
           </Section>
@@ -349,16 +353,24 @@ export default function PublishPage() {
           <AnimatePresence>
             {result && (
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
+                initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
                 className={`flex items-start gap-3 p-4 rounded-xl border text-sm ${
                   result.ok
                     ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400"
                     : "bg-destructive/5 border-destructive/20 text-destructive"
                 }`}
               >
-                {result.ok ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20, delay: 0.1 }}
+                  className="shrink-0 mt-0.5"
+                >
+                  {result.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                </motion.span>
                 <div className="flex-1">
                   <p className="font-medium">{result.message}</p>
                   {result.url && (
@@ -379,7 +391,8 @@ export default function PublishPage() {
             )}
           </AnimatePresence>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.97 }}
             onClick={handleSubmit}
             disabled={!canSubmit}
             className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
@@ -394,7 +407,7 @@ export default function PublishPage() {
             {submitting
               ? mode === "now" ? "Posting…" : "Scheduling…"
               : mode === "now" ? "Post Now" : "Schedule Post"}
-          </button>
+          </motion.button>
         </div>
 
         <div>
@@ -409,9 +422,19 @@ export default function PublishPage() {
             </div>
           ) : (
             <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-              {queue.map((post) => (
-                <QueueCard key={post.id} post={post} onCancel={() => handleCancelPost(post.id)} />
-              ))}
+              <AnimatePresence>
+                {queue.map((post, i) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.25, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    <QueueCard post={post} onCancel={() => handleCancelPost(post.id)} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
