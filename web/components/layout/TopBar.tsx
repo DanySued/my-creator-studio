@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/carousel", icon: GalleryHorizontal, label: "Carousel" },
   { href: "/reels", icon: Video, label: "Reels" },
   { href: "/publish", icon: Send, label: "Publish" },
@@ -73,7 +73,7 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header className="flex items-center h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm shrink-0 gap-4">
+    <header className="relative flex items-center h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15 ring-1 ring-primary/30">
@@ -82,10 +82,8 @@ export default function TopBar() {
         <span className="text-sm font-semibold text-foreground tracking-tight">Creator Studio</span>
       </div>
 
-      <div className="h-5 w-px bg-border shrink-0" />
-
-      {/* Nav links */}
-      <nav className="flex items-center gap-0.5 flex-1">
+      {/* Nav links — absolutely centered */}
+      <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
           <Link
             key={href}
@@ -104,7 +102,7 @@ export default function TopBar() {
       </nav>
 
       {/* Right: API status + settings + sign out */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="ml-auto flex items-center gap-2 shrink-0">
         <ApiStatusIndicator status={apiStatus} />
         <div className="h-4 w-px bg-border" />
         <Link
