@@ -110,30 +110,24 @@ export default function AutomationPage() {
           </div>
         </div>
 
-        {!loadingAccounts && accounts.length > 0 && (
-          <AccountSelector
-            accounts={accounts}
-            selected={selectedAccount}
-            onSelect={setSelectedAccount}
-          />
+        {!loadingAccounts && (
+          accounts.length > 0 ? (
+            <AccountSelector
+              accounts={accounts}
+              selected={selectedAccount}
+              onSelect={setSelectedAccount}
+            />
+          ) : (
+            <a
+              href="/accounts"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-amber-500/30 bg-amber-500/5 text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Connect Instagram Account
+            </a>
+          )
         )}
       </div>
-
-      {!loadingAccounts && accounts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
-            <Bot className="w-7 h-7 text-violet-400" />
-          </div>
-          <h2 className="text-lg font-semibold text-foreground mb-1">No connected accounts</h2>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            Connect an Instagram account on the{" "}
-            <a href="/accounts" className="text-primary underline-offset-2 hover:underline">
-              Accounts
-            </a>{" "}
-            page first.
-          </p>
-        </div>
-      )}
 
       {loadingAccounts && (
         <div className="flex items-center justify-center py-24">
@@ -141,8 +135,19 @@ export default function AutomationPage() {
         </div>
       )}
 
-      {!loadingAccounts && selectedAccount && (
+      {!loadingAccounts && (
         <>
+          {accounts.length === 0 && (
+            <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/15 text-sm text-amber-400 mb-6">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Connect an Instagram account on the{" "}
+              <a href="/accounts" className="font-semibold underline underline-offset-2 hover:text-amber-300">
+                Accounts page
+              </a>{" "}
+              to run these features.
+            </div>
+          )}
+
           <div className="flex gap-1 mb-6 bg-secondary/50 rounded-xl p-1 w-fit">
             {TABS.map(({ id, label, icon: Icon }) => (
               <button
@@ -163,27 +168,27 @@ export default function AutomationPage() {
           <AnimatePresence mode="wait">
             {tab === "replies" && (
               <TabPanel key="replies">
-                <CommentRepliesTab accountId={selectedAccount.id} />
+                <CommentRepliesTab accountId={selectedAccount?.id ?? ""} />
               </TabPanel>
             )}
             {tab === "followers" && (
               <TabPanel key="followers">
-                <FollowerTrackerTab accountId={selectedAccount.id} />
+                <FollowerTrackerTab accountId={selectedAccount?.id ?? ""} />
               </TabPanel>
             )}
             {tab === "dms" && (
               <TabPanel key="dms">
-                <WelcomeDMsTab accountId={selectedAccount.id} />
+                <WelcomeDMsTab accountId={selectedAccount?.id ?? ""} />
               </TabPanel>
             )}
             {tab === "growth" && (
               <TabPanel key="growth">
-                <GrowthActionsTab accountId={selectedAccount.id} />
+                <GrowthActionsTab accountId={selectedAccount?.id ?? ""} />
               </TabPanel>
             )}
             {tab === "log" && (
               <TabPanel key="log">
-                <ActivityLogTab accountId={selectedAccount.id} />
+                <ActivityLogTab accountId={selectedAccount?.id ?? ""} />
               </TabPanel>
             )}
           </AnimatePresence>
@@ -274,6 +279,7 @@ function CommentRepliesTab({ accountId }: { accountId: string }) {
   };
 
   const fetchRules = useCallback(async () => {
+    if (!accountId) { setLoading(false); return; }
     try {
       const r = await fetch(`/api/automation/autoreply/rules/${accountId}`);
       if (r.ok) setRules(await r.json());
@@ -513,6 +519,7 @@ function FollowerTrackerTab({ accountId }: { accountId: string }) {
   };
 
   const fetchSnapshot = useCallback(async () => {
+    if (!accountId) { setLoading(false); return; }
     try {
       const r = await fetch(`/api/automation/followers/snapshot/${accountId}`);
       if (r.ok) {
@@ -658,6 +665,7 @@ function WelcomeDMsTab({ accountId }: { accountId: string }) {
   };
 
   const fetchRules = useCallback(async () => {
+    if (!accountId) { setLoading(false); return; }
     try {
       const r = await fetch(`/api/automation/dm/rules/${accountId}`);
       if (r.ok) setRules(await r.json());
@@ -866,6 +874,7 @@ function GrowthActionsTab({ accountId }: { accountId: string }) {
   };
 
   const fetchCounts = useCallback(async () => {
+    if (!accountId) { setLoadingCounts(false); return; }
     try {
       const r = await fetch(`/api/automation/growth/counts/${accountId}`);
       if (r.ok) setCounts(await r.json());
@@ -1114,6 +1123,7 @@ function ActivityLogTab({ accountId }: { accountId: string }) {
   const [filter, setFilter] = useState("");
 
   const fetchLogs = useCallback(async () => {
+    if (!accountId) { setLoading(false); return; }
     try {
       const r = await fetch(`/api/automation/activity-log/${accountId}?limit=200`);
       if (r.ok) setLogs(await r.json());
