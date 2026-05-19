@@ -1,24 +1,29 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  LayoutDashboard,
+  GalleryHorizontal,
+  Video,
+  Send,
+  Users,
+  Settings,
+  Sparkles,
+  Bot,
+  LogOut,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const PAGE_TITLES: Record<string, { title: string; description: string }> = {
-  "/dashboard": { title: "Overview", description: "Your content studio at a glance" },
-  "/carousel": { title: "Carousel", description: "Generate Instagram carousel slides from documents" },
-  "/reels": { title: "Reels", description: "Create short-form videos from keywords and audio" },
-  "/publish": { title: "Publish", description: "Post and schedule content to your Instagram accounts" },
-  "/accounts": { title: "Accounts", description: "Manage your connected Instagram accounts" },
-  "/automation": { title: "Automation", description: "Auto-reply, follower tracking, and growth actions" },
-  "/settings": { title: "Settings", description: "Configure API connections and preferences" },
-};
-
-function getPageMeta(pathname: string) {
-  for (const [path, meta] of Object.entries(PAGE_TITLES)) {
-    if (pathname === path || pathname.startsWith(path + "/")) return meta;
-  }
-  return { title: "My Creator Studio", description: "" };
-}
+const NAV_ITEMS = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+  { href: "/carousel", icon: GalleryHorizontal, label: "Carousel" },
+  { href: "/reels", icon: Video, label: "Reels" },
+  { href: "/publish", icon: Send, label: "Publish" },
+  { href: "/accounts", icon: Users, label: "Accounts" },
+  { href: "/automation", icon: Bot, label: "Automation" },
+];
 
 type ApiStatus = "checking" | "online" | "offline";
 
@@ -49,8 +54,9 @@ function ApiStatusIndicator({ status }: { status: ApiStatus }) {
 
 export default function TopBar() {
   const pathname = usePathname();
-  const meta = getPageMeta(pathname);
+  const router = useRouter();
   const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   useEffect(() => {
     const check = async () => {
@@ -67,14 +73,60 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between h-14 px-6 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
-      <div>
-        <h1 className="text-sm font-semibold text-foreground leading-none">{meta.title}</h1>
-        {meta.description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{meta.description}</p>
-        )}
+    <header className="flex items-center h-14 px-4 border-b border-border bg-background/80 backdrop-blur-sm shrink-0 gap-4">
+      {/* Logo */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15 ring-1 ring-primary/30">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+        </div>
+        <span className="text-sm font-semibold text-foreground tracking-tight">Creator Studio</span>
       </div>
-      <ApiStatusIndicator status={apiStatus} />
+
+      <div className="h-5 w-px bg-border shrink-0" />
+
+      {/* Nav links */}
+      <nav className="flex items-center gap-0.5 flex-1">
+        {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex items-center gap-2 px-3 h-8 rounded-md transition-all duration-150 text-sm font-medium",
+              isActive(href)
+                ? "bg-primary/20 text-primary ring-1 ring-primary/25"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
+            )}
+          >
+            <Icon className="w-4 h-4 shrink-0" />
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {/* Right: API status + settings + sign out */}
+      <div className="flex items-center gap-2 shrink-0">
+        <ApiStatusIndicator status={apiStatus} />
+        <div className="h-4 w-px bg-border" />
+        <Link
+          href="/settings"
+          className={cn(
+            "flex items-center px-2 h-8 rounded-md transition-all duration-150",
+            isActive("/settings")
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
+          )}
+        >
+          <Settings className="w-4 h-4" />
+        </Link>
+        <button
+          onClick={() => {
+            fetch("/api/auth/logout", { method: "POST" }).finally(() => router.push("/login"));
+          }}
+          className="flex items-center px-2 h-8 rounded-md transition-all duration-150 text-muted-foreground hover:text-red-400 hover:bg-red-500/[0.07]"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
+      </div>
     </header>
   );
 }
