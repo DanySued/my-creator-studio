@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
@@ -9,7 +9,7 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv(usecwd=False) or ".env")
 
 from routers import health, carousel, reels, instagram, automation
-from models.database import init_db
+from models.database import init_db, db
 from services.job_queue import init_scheduler
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="My Creator Studio API", version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def db_connection_middleware(request: Request, call_next):
+    db.connect(reuse_if_open=True)
+    try:
+        response = await call_next(request)
+    finally:
+        if not db.is_closed():
+            db.close()
+    return response
+
 
 _origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(

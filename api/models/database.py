@@ -7,14 +7,16 @@ from peewee import Model, CharField, TextField, IntegerField, DateTimeField, For
 # Use PostgreSQL when DATABASE_URL is set (Railway/Supabase), else fall back to SQLite
 _DATABASE_URL = os.getenv("DATABASE_URL")
 if _DATABASE_URL:
-    from peewee import PostgresqlDatabase
+    from playhouse.pool import PooledPostgresqlDatabase
     _p = urllib.parse.urlparse(_DATABASE_URL)
-    db = PostgresqlDatabase(
+    db = PooledPostgresqlDatabase(
         _p.path.lstrip("/"),
         host=_p.hostname,
         port=_p.port or 5432,
         user=_p.username,
         password=_p.password,
+        max_connections=10,
+        stale_timeout=300,
     )
 else:
     from peewee import SqliteDatabase

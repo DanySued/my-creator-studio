@@ -121,18 +121,19 @@ def _phase1_prepare_clips(
         video_paths = []
         try:
             fetch_pool = min(max(download_count * 3, 15), 80)
-            video_list = asyncio_run(search_videos(request.keywords, per_page=fetch_pool))
-            random.shuffle(video_list)
-            candidates = video_list[:download_count]
-            video_paths = [os.path.join(reel_dir, f"video_{i}.mp4") for i in range(len(candidates))]
 
-            async def _download_all():
+            async def _search_and_download() -> list[str]:
+                video_list = await search_videos(request.keywords, per_page=fetch_pool)
+                random.shuffle(video_list)
+                candidates = video_list[:download_count]
+                paths = [os.path.join(reel_dir, f"video_{i}.mp4") for i in range(len(candidates))]
                 await asyncio.gather(*[
                     download_video(meta["url"], path)
-                    for meta, path in zip(candidates, video_paths)
+                    for meta, path in zip(candidates, paths)
                 ])
+                return paths
 
-            asyncio_run(_download_all())
+            video_paths = asyncio_run(_search_and_download())
         except Exception as e:
             raise ValueError(f"Pexels integration failed: {str(e)}")
 
