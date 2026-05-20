@@ -48,6 +48,8 @@ def _save_carousel_to_db(carousel_id: str, title: str, theme: str, slide_pairs: 
             }
             for i, (slide_title, slide_content) in enumerate(slide_pairs)
         ]).execute()
+
+
 CAROUSEL_DIR = os.path.join(MEDIA_DIR, "generated")
 os.makedirs(CAROUSEL_DIR, exist_ok=True)
 
@@ -143,15 +145,6 @@ async def bulk_generate_carousel(request: BulkCarouselRequest):
     if request.slides_per_carousel < 3 or request.slides_per_carousel > 10:
         raise HTTPException(status_code=400, detail="slides_per_carousel must be between 3 and 10")
 
-    async def _fetch_bg(query: str, idx: int) -> str:
-        """Fetch a Pexels background URL, falling back to the topic query."""
-        try:
-            photos = await search_photos(query=query, per_page=5)
-            return photos[idx % len(photos)]["full"]
-        except Exception:
-            photos = await search_photos(query=request.topic, per_page=10)
-            return photos[idx % len(photos)]["full"]
-
     async def _generate_one_carousel(carousel_idx: int) -> list[bytes]:
         """Run Gemini + parallel Pexels fetches + Pillow render for one carousel."""
         topic_slides = await asyncio.to_thread(
@@ -160,8 +153,21 @@ async def bulk_generate_carousel(request: BulkCarouselRequest):
             slide_count=request.slides_per_carousel,
             tone=request.tone,
         )
+
+        try:
+            fallback_photos = await search_photos(query=request.topic, per_page=10)
+        except Exception:
+            fallback_photos = []
+
+        async def _fetch_bg(query: str, slide_idx: int) -> str:
+            try:
+                photos = await search_photos(query=query, per_page=5)
+                return photos[slide_idx % len(photos)]["full"]
+            except Exception:
+                return fallback_photos[slide_idx % len(fallback_photos)]["full"]
+
         bg_urls = await asyncio.gather(*[
-            _fetch_bg(ts.pexels_query, carousel_idx) for ts in topic_slides
+            _fetch_bg(ts.pexels_query, slide_idx) for slide_idx, ts in enumerate(topic_slides)
         ])
         specs = [
             SlideSpec(slide_type=ts.slide_type, title=ts.title, body=ts.body, bg_image_url=url)

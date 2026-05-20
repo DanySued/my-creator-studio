@@ -434,6 +434,8 @@ def get_job_status(job_id: str) -> dict:
                 srt_path = job.reel.srt_path or None
             except Exception:
                 pass
+        if job.status in ("done", "failed"):
+            JOBS.pop(job_id, None)
         return {
             "job_id": job_id,
             "reel_id": job.reel.id if job.reel else None,
@@ -572,3 +574,4 @@ def asyncio_run(coro):
         return loop.run_until_complete(coro)
     finally:
         loop.close()
+        asyncio.set_event_loop(None)
