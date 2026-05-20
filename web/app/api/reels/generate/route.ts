@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         audio_file_id: body.audioFileId,
         duration: body.duration || 15,
         title: body.title || 'Generated Reel',
-        song_start_time: body.songStartTime || 0,
+        song_start_time: body.songStartTime ?? 0,
         overlays: body.overlays ?? [],
         subtitles_enabled: body.subtitlesEnabled ?? false,
       }),

@@ -14,3 +14,4 @@ apscheduler==3.10.4
 moviepy==1.0.3
 Pillow==11.1.0
 soundfile==0.12.1
+openai-whisper

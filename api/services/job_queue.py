@@ -173,12 +173,11 @@ def _phase1_prepare_clips(
         if len(clips) < target_clip_count:
             clip_duration = request.duration / len(clips)
 
-            def _retrim_one(args: tuple) -> str:
-                idx, clip_path = args
+            def _retrim_one(clip_path: str) -> str:
                 try:
                     video_dur = get_video_duration(clip_path)
                     start = random.uniform(0, max(0.0, video_dur - clip_duration))
-                    retrimmed_path = clip_path.replace(f"clip_{idx}.mp4", f"clip_{idx}_rt.mp4")
+                    retrimmed_path = clip_path.rsplit(".mp4", 1)[0] + "_rt.mp4"
                     trim_video(clip_path, retrimmed_path, start, clip_duration)
                     os.remove(clip_path)
                     return retrimmed_path
@@ -186,7 +185,7 @@ def _phase1_prepare_clips(
                     return clip_path
 
             with ThreadPoolExecutor(max_workers=len(clips)) as pool:
-                clips = list(pool.map(_retrim_one, enumerate(clips)))
+                clips = list(pool.map(_retrim_one, clips))
 
         # Pause for clip approval (50%)
         job.clip_paths = json.dumps(clips)
