@@ -135,16 +135,13 @@ async def list_audio_files():
     """
     try:
         audio_files = AudioFile.select().order_by(AudioFile.uploaded_at.desc())
-        return AudioListResponse(
-            audio_files=[
-                AudioUploadResponse(
-                    id=a.id,
-                    filename=a.filename,
-                    duration=a.duration,
-                )
-                for a in audio_files
-            ]
-        )
+        valid = []
+        for a in audio_files:
+            if os.path.exists(a.file_path):
+                valid.append(AudioUploadResponse(id=a.id, filename=a.filename, duration=a.duration))
+            else:
+                a.delete_instance()  # prune stale record whose volume file is gone
+        return AudioListResponse(audio_files=valid)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list audio: {str(e)}")
 

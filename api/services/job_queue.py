@@ -56,6 +56,11 @@ def create_reel_generation_job(request: ReelGenerateRequest) -> str:
     except Exception:
         raise ValueError("Audio file not found")
 
+    if not os.path.exists(audio.file_path):
+        # Stale DB record — the volume file was deleted (e.g. Railway redeploy).
+        audio.delete_instance()
+        raise ValueError("Audio file no longer exists on disk — please re-upload it")
+
     try:
         reel = Reel.create(
             id=reel_id,
