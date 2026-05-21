@@ -14,7 +14,7 @@ class KeyPayload(BaseModel):
 @router.post("/gemini")
 async def test_gemini(payload: KeyPayload):
     """Test a Gemini API key by making a minimal generation call."""
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     headers = {"Content-Type": "application/json"}
     params = {"key": payload.apiKey}
     body = {"contents": [{"parts": [{"text": "Say OK"}]}]}

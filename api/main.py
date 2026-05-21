@@ -7,6 +7,10 @@ import os
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv(usecwd=False) or ".env")
+# Restore keys saved via the UI (written to persistent volume, not Railway env vars)
+_keys_file = os.path.join(os.getenv("DATA_DIR", "/data"), ".env.keys")
+if os.path.isfile(_keys_file):
+    load_dotenv(_keys_file, override=True)
 
 from routers import health, carousel, reels, instagram, automation
 from models.database import init_db, db
