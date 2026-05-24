@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   X,
+  PenLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/publish", icon: Send, label: "Publish" },
   { href: "/accounts", icon: Users, label: "Accounts" },
   { href: "/automation", icon: Bot, label: "Automation" },
+  { href: "/svg-editor", icon: PenLine, label: "SVG Editor" },
 ];
 
 type ApiStatus = "checking" | "online" | "offline";
