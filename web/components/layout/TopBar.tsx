@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   PenLine,
+  Layers2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/accounts", icon: Users, label: "Accounts" },
   { href: "/automation", icon: Bot, label: "Automation" },
   { href: "/svg-editor", icon: PenLine, label: "SVG Editor" },
+  { href: "/canvas-editor", icon: Layers2, label: "Canvas" },
 ];
 
 type ApiStatus = "checking" | "online" | "offline";
