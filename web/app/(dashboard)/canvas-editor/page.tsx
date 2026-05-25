@@ -32,6 +32,13 @@ const TOOLS: { id: Tool; icon: React.ElementType; label: string }[] = [
 
 const FONTS = ["Arial", "Georgia", "Times New Roman", "Courier New", "Verdana", "Impact"];
 
+const CANVAS_SIZES = [
+  { id: "square",   label: "1:1",  sublabel: "1080 × 1080", w: 1080, h: 1080 },
+  { id: "portrait", label: "4:5",  sublabel: "1080 × 1350", w: 1080, h: 1350 },
+  { id: "story",    label: "9:16", sublabel: "1080 × 1920", w: 1080, h: 1920 },
+] as const;
+type SizeId = typeof CANVAS_SIZES[number]["id"];
+
 // ---------------------------------------------------------------------------
 // Template registry
 // ---------------------------------------------------------------------------
@@ -237,6 +244,12 @@ export default function CanvasEditorPage() {
   // Kept in a ref so click handlers always see current values without stale closures
   const propsRef = useRef({ fill: "#6366f1", stroke: "#000000", strokeWidth: 2, fontSize: 36, fontFamily: "Arial" });
 
+  // Canvas dimensions — kept in both state (for JSX) and a ref (for ResizeObserver closure)
+  const [sizeId, setSizeId]         = useState<SizeId>("square");
+  const [canvW, setCanvW]           = useState(1080);
+  const [canvH, setCanvH]           = useState(1080);
+  const dimsRef                     = useRef({ w: 1080, h: 1080 });
+
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [scale, setScale]           = useState(0.6);
   const [selectedObj, setSelectedObj] = useState<any>(null);
@@ -347,6 +360,8 @@ export default function CanvasEditorPage() {
 
   const applyTemplate = (templateId: string) => {
     if (!fc.current || !fabricMod.current) return;
+    // Templates are designed for 1080×1080 — switch to square first
+    changeSize("square");
     buildTemplate(templateId, fc.current, fabricMod.current);
     const tpl = TEMPLATES.find((t) => t.id === templateId);
     if (tpl) setBgColor(tpl.bgColor);
@@ -355,6 +370,26 @@ export default function CanvasEditorPage() {
     setShowTemplates(false);
     saveHistory();
   };
+
+  const recalcScale = useCallback((w: number, h: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setScale(Math.max(Math.min((width - 48) / w, (height - 48) / h, 1), 0.1));
+  }, []);
+
+  const changeSize = useCallback((id: SizeId) => {
+    const sz = CANVAS_SIZES.find((s) => s.id === id)!;
+    setSizeId(id);
+    setCanvW(sz.w);
+    setCanvH(sz.h);
+    dimsRef.current = { w: sz.w, h: sz.h };
+    if (fc.current) {
+      fc.current.setDimensions({ width: sz.w, height: sz.h });
+      fc.current.renderAll();
+    }
+    recalcScale(sz.w, sz.h);
+  }, [recalcScale]);
 
   // Reconfigure canvas whenever the active tool changes
   useEffect(() => {
@@ -409,13 +444,14 @@ export default function CanvasEditorPage() {
     canvas.renderAll();
   }, [activeTool]);
 
-  // Scale canvas to fit container
+  // Scale canvas to fit container — reads dimsRef so it's always current
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
-      setScale(Math.max(Math.min((width - 48) / 1080, (height - 48) / 1080, 1), 0.1));
+      const { w, h } = dimsRef.current;
+      setScale(Math.max(Math.min((width - 48) / w, (height - 48) / h, 1), 0.1));
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -465,7 +501,7 @@ export default function CanvasEditorPage() {
     const dataUrl = canvas.toDataURL({ format: "png", multiplier: 1 });
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = "canvas-1080x1080.png";
+    a.download = `canvas-${canvW}x${canvH}.png`;
     a.click();
   };
 
@@ -561,9 +597,24 @@ export default function CanvasEditorPage() {
       <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden bg-zinc-950/50">
         {/* Toolbar */}
         <div className="shrink-0 flex items-center justify-between px-4 h-11 border-b border-border bg-background/80">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-mono">1080 × 1080 px</span>
-            <div className="h-3 w-px bg-border" />
+          <div className="flex items-center gap-1.5">
+            {/* Canvas size picker */}
+            {CANVAS_SIZES.map((sz) => (
+              <button
+                key={sz.id}
+                title={sz.sublabel}
+                onClick={() => changeSize(sz.id)}
+                className={cn(
+                  "flex flex-col items-center justify-center px-2.5 h-7 rounded-md text-xs font-medium transition-colors gap-0",
+                  sizeId === sz.id
+                    ? "bg-primary/20 text-primary ring-1 ring-primary/25"
+                    : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
+                )}
+              >
+                {sz.label}
+              </button>
+            ))}
+            <div className="h-3 w-px bg-border mx-1" />
             <button
               onClick={openTemplates}
               className={cn(
@@ -576,6 +627,8 @@ export default function CanvasEditorPage() {
               <LayoutTemplate className="w-3.5 h-3.5" />
               Templates
             </button>
+            <div className="h-3 w-px bg-border mx-1" />
+            <span className="text-xs text-muted-foreground font-mono">{canvW} × {canvH}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -597,13 +650,13 @@ export default function CanvasEditorPage() {
 
         {/* Canvas viewport */}
         <div className="flex-1 flex items-center justify-center overflow-auto p-6">
-          <div style={{ width: 1080 * scale, height: 1080 * scale, flexShrink: 0 }}>
+          <div style={{ width: canvW * scale, height: canvH * scale, flexShrink: 0 }}>
             <div
               style={{
                 transform: `scale(${scale})`,
                 transformOrigin: "top left",
-                width: 1080,
-                height: 1080,
+                width: canvW,
+                height: canvH,
                 boxShadow: "0 0 0 1px rgba(255,255,255,0.08), 0 8px 48px rgba(0,0,0,0.6)",
                 borderRadius: 4,
                 overflow: "hidden",
@@ -753,13 +806,13 @@ export default function CanvasEditorPage() {
                   onClick={() => applyTemplate(tpl.id)}
                   className="w-full text-left group rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
-                  {/* Actual rendered thumbnail */}
-                  <div className="relative h-[150px] bg-zinc-900 overflow-hidden">
+                  {/* Actual rendered thumbnail — aspect-square so square renders don't crop */}
+                  <div className="relative w-full aspect-square bg-zinc-900 overflow-hidden">
                     {thumbnails[tpl.id] ? (
                       <img
                         src={thumbnails[tpl.id]}
                         alt={tpl.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center">
