@@ -99,6 +99,7 @@ class CarouselFromTextRequest(BaseModel):
     font: str = "inter"
     size: str = "1080x1350"
     slide_count: Optional[int] = None   # None = let Gemini decide
+    tone: str = "casual"
 
 
 class CarouselFromTextResponse(BaseModel):

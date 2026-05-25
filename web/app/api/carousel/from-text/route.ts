@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
         theme: body.theme || 'midnight',
         handle: body.handle || '',
         slide_count: body.slideCount || null,
+        tone: body.tone || 'casual',
       }),
     });
 

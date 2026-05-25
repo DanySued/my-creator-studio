@@ -207,6 +207,7 @@ Rules:
 def format_text_as_carousel_slides(
     raw_text: str,
     slide_count: Optional[int] = None,
+    tone: str = "casual",
 ) -> List[CarouselSlideItem]:
     """
     Parse and format arbitrary pasted text into carousel slides.
@@ -215,8 +216,11 @@ def format_text_as_carousel_slides(
     Output: Cover + content slides + CTA, as CarouselSlideItem list.
     """
     target = f"exactly {slide_count}" if slide_count else "between 5 and 8 (choose the best fit for the content)"
+    tone_instruction = TONE_INSTRUCTIONS.get(tone, TONE_INSTRUCTIONS["casual"])
 
     prompt = f"""You are an Instagram content strategist. Transform the following text into a carousel slide deck.
+
+Tone: {tone_instruction}
 
 Text:
 ---

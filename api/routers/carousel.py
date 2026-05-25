@@ -210,6 +210,7 @@ async def generate_from_text(request: CarouselFromTextRequest):
             format_text_as_carousel_slides,
             raw_text=request.raw_text,
             slide_count=request.slide_count,
+            tone=request.tone,
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")

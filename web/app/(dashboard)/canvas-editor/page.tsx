@@ -5,6 +5,7 @@ import {
   MousePointer2, Type, Square, Circle as CircleIcon, Minus, Pen,
   ImagePlus, Download, Trash2, RotateCcw, RotateCw,
   LayoutTemplate, X, Loader2, Plus, Copy, Sparkles,
+  AlignLeft, AlignCenter, AlignRight, BringToFront, SendToBack,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -260,6 +261,8 @@ export default function CanvasEditorPage() {
   const [fontFamily, setFontFamily] = useState("Arial");
   const [bold, setBold]             = useState(false);
   const [italic, setItalic]         = useState(false);
+  const [textAlign, setTextAlign]   = useState<"left" | "center" | "right">("left");
+  const [opacity, setOpacity]       = useState(100);
   const [brushSize, setBrushSize]   = useState(8);
   const [brushColor, setBrushColor] = useState("#000000");
   const [bgColor, setBgColor]       = useState("#ffffff");
@@ -287,12 +290,14 @@ export default function CanvasEditorPage() {
     setSelectedObj(obj);
     const type: string = obj.type;
     setObjType(type);
+    setOpacity(Math.round((obj.opacity ?? 1) * 100));
     if (type === "i-text" || type === "textbox") {
       setFontSize(obj.fontSize ?? 36);
       setFontFamily(obj.fontFamily ?? "Arial");
       setFill(typeof obj.fill === "string" ? obj.fill : "#000000");
       setBold(obj.fontWeight === "bold");
       setItalic(obj.fontStyle === "italic");
+      setTextAlign((obj.textAlign as "left" | "center" | "right") ?? "left");
     } else if (["rect", "circle", "triangle", "ellipse"].includes(type)) {
       setFill(typeof obj.fill === "string" ? obj.fill : "#6366f1");
       setStroke(obj.stroke ?? "#000000");
@@ -458,7 +463,8 @@ export default function CanvasEditorPage() {
         body: JSON.stringify({
           rawText:    aiTopic,
           slideCount: aiSlideCount,
-          theme:      "minimal",
+          theme:      aiTemplate,
+          tone:       aiTone,
           handle:     "",
           font:       "serif",
           size:       "square",
@@ -724,30 +730,41 @@ export default function CanvasEditorPage() {
     <div className="flex h-full relative">
 
       {/* ── Tool sidebar ─────────────────────────────────────────────────── */}
-      <aside className="w-14 shrink-0 border-r border-border flex flex-col items-center py-3 gap-1 bg-background z-10">
+      <aside className="w-[68px] shrink-0 border-r border-border flex flex-col items-center py-3 gap-0.5 bg-background z-10">
         {TOOLS.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             title={label}
             onClick={() => setActiveTool(id)}
             className={cn(
-              "flex items-center justify-center w-9 h-9 rounded-lg transition-colors",
+              "flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors gap-0.5",
               activeTool === id
                 ? "bg-primary/20 text-primary ring-1 ring-primary/30"
                 : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
             )}
           >
             <Icon className="w-4 h-4" />
+            <span className="text-[9px] font-medium leading-none">{label}</span>
           </button>
         ))}
-        <div className="h-px w-6 bg-border my-1" />
-        <button title="Upload image" onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+        <div className="h-px w-8 bg-border my-1" />
+        <button title="Upload image" onClick={() => fileInputRef.current?.click()}
+          className="flex flex-col items-center justify-center w-14 h-12 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
           <ImagePlus className="w-4 h-4" />
+          <span className="text-[9px] font-medium leading-none">Image</span>
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-        <div className="mt-auto flex flex-col gap-1">
-          <button title="Undo (Ctrl+Z)" onClick={undo} className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"><RotateCcw className="w-4 h-4" /></button>
-          <button title="Redo (Ctrl+Y)" onClick={redo} className="flex items-center justify-center w-9 h-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"><RotateCw className="w-4 h-4" /></button>
+        <div className="mt-auto flex flex-col gap-0.5">
+          <button title="Undo (Ctrl+Z)" onClick={undo}
+            className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="text-[9px] font-medium leading-none">Undo</span>
+          </button>
+          <button title="Redo (Ctrl+Y)" onClick={redo}
+            className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+            <RotateCw className="w-3.5 h-3.5" />
+            <span className="text-[9px] font-medium leading-none">Redo</span>
+          </button>
         </div>
       </aside>
 
@@ -770,7 +787,7 @@ export default function CanvasEditorPage() {
               )}>
               <LayoutTemplate className="w-3.5 h-3.5" />Templates
             </button>
-            <button onClick={() => { setShowTemplates(false); setShowAiPanel(v => !v); }}
+            <button onClick={() => { setShowTemplates(false); setShowAiPanel(v => !v); generateThumbnails(); }}
               className={cn("flex items-center gap-1.5 px-2.5 h-7 rounded-md text-xs transition-colors",
                 showAiPanel ? "bg-primary/20 text-primary ring-1 ring-primary/25" : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
               )}>
@@ -853,7 +870,7 @@ export default function CanvasEditorPage() {
       </div>
 
       {/* ── Properties panel ─────────────────────────────────────────────── */}
-      <aside className="w-52 shrink-0 border-l border-border overflow-y-auto bg-background">
+      <aside className="w-56 shrink-0 border-l border-border overflow-y-auto bg-background">
         <div className="p-3 border-b border-border">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Properties</p>
         </div>
@@ -882,6 +899,39 @@ export default function CanvasEditorPage() {
             </>
           )}
 
+          {selectedObj && (
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground">Opacity: {opacity}%</label>
+              <input type="range" min={0} max={100} value={opacity} onChange={e => {
+                const v = +e.target.value;
+                setOpacity(v);
+                updateProp({ opacity: v / 100 });
+              }} className="w-full accent-primary" />
+            </div>
+          )}
+
+          {selectedObj && (
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Layer</label>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => { fc.current?.bringObjectToFront(fc.current.getActiveObject()); fc.current?.renderAll(); }}
+                  title="Bring to front"
+                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"
+                >
+                  <BringToFront className="w-3 h-3" />Front
+                </button>
+                <button
+                  onClick={() => { fc.current?.sendObjectToBack(fc.current.getActiveObject()); fc.current?.renderAll(); }}
+                  title="Send to back"
+                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"
+                >
+                  <SendToBack className="w-3 h-3" />Back
+                </button>
+              </div>
+            </div>
+          )}
+
           {isTextObj && (
             <>
               <div className="space-y-2">
@@ -898,9 +948,24 @@ export default function CanvasEditorPage() {
                 <label className="text-xs text-muted-foreground">Size</label>
                 <input type="number" value={fontSize} min={8} max={400} onChange={e => { setFontSize(+e.target.value); updateProp({ fontSize: +e.target.value }); }} className="w-full h-8 rounded-md border border-border bg-background text-xs px-2 text-foreground" />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button onClick={() => { const nb = !bold; setBold(nb); updateProp({ fontWeight: nb ? "bold" : "normal" }); }} className={cn("flex-1 h-8 rounded-md text-xs font-bold border transition-colors", bold ? "bg-primary/20 text-primary border-primary/30" : "border-border text-muted-foreground hover:text-foreground")}>B</button>
                 <button onClick={() => { const ni = !italic; setItalic(ni); updateProp({ fontStyle: ni ? "italic" : "normal" }); }} className={cn("flex-1 h-8 rounded-md text-xs italic border transition-colors", italic ? "bg-primary/20 text-primary border-primary/30" : "border-border text-muted-foreground hover:text-foreground")}>I</button>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Align</label>
+                <div className="flex gap-1.5">
+                  {(["left", "center", "right"] as const).map(a => {
+                    const Icon = a === "left" ? AlignLeft : a === "center" ? AlignCenter : AlignRight;
+                    return (
+                      <button key={a} onClick={() => { setTextAlign(a); updateProp({ textAlign: a }); }}
+                        className={cn("flex-1 h-7 rounded-md border flex items-center justify-center transition-colors",
+                          textAlign === a ? "bg-primary/20 text-primary border-primary/30" : "border-border text-muted-foreground hover:text-foreground")}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </>
           )}
