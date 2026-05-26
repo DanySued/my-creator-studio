@@ -64,19 +64,39 @@ const pad = (n: number) => String(n).padStart(2, "0");
 interface TemplateDef { id: string; name: string; description: string; bgColor: string; }
 
 const TEMPLATES: TemplateDef[] = [
-  { id: "noir",    name: "Noir",    description: "Dark editorial — gold accents",     bgColor: "#0c0c0c" },
-  { id: "sunrise", name: "Sunrise", description: "Bold orange energy poster",         bgColor: "#ff4500" },
-  { id: "minimal", name: "Minimal", description: "Swiss-style clean typography",      bgColor: "#ffffff" },
-  { id: "aurora",  name: "Aurora",  description: "Moody purple bokeh with bold type", bgColor: "#0d0021" },
+  { id: "noir",     name: "Noir",     description: "Dark editorial — gold accents",      bgColor: "#0c0c0c" },
+  { id: "sunrise",  name: "Sunrise",  description: "Bold orange energy poster",          bgColor: "#ff4500" },
+  { id: "minimal",  name: "Minimal",  description: "Swiss-style clean typography",       bgColor: "#ffffff" },
+  { id: "aurora",   name: "Aurora",   description: "Moody purple bokeh with bold type",  bgColor: "#0d0021" },
+  { id: "gradient", name: "Gradient", description: "Deep navy-to-violet night sky",      bgColor: "#0a0a1a" },
+  { id: "studio",   name: "Studio",   description: "Charcoal magazine editorial style",  bgColor: "#141414" },
+  { id: "pastel",   name: "Pastel",   description: "Warm cream — Instagram-ready soft",  bgColor: "#fff8f5" },
+];
+
+const COLOR_SWATCHES = [
+  "#000000","#ffffff","#ef4444","#f97316","#eab308",
+  "#22c55e","#3b82f6","#8b5cf6","#ec4899","#6366f1",
+  "#d4af37","#ff4500","#0d0021","#0c0c0c","#141414",
 ];
 
 /**
  * Builds a template onto any Fabric canvas (Canvas or StaticCanvas).
+ * All y-positions scale with `ys = h/1080` so templates render correctly
+ * across Square (1080), Portrait (1350), and Story (1920) canvas heights.
  * When slideData is supplied the dynamic title/body replace the hardcoded
  * decorative text so every AI-generated slide shares the same design language.
  */
 function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData) {
   canvas.clear();
+
+  const w: number = canvas.width;
+  const h: number = canvas.height;
+  const ys = h / 1080;  // vertical scale: 1.0 for square, 1.25 portrait, 1.78 story
+
+  const lm  = 60;                    // left margin (px, fixed — width is always 1080)
+  const rm  = 1000;                  // right margin
+  const cx  = Math.round(w / 2);    // center x
+  const bY  = Math.round(h * 0.9);  // brand bottom y
 
   const add = (o: any) => canvas.add(o);
   const bg  = (c: string) => canvas.set("backgroundColor", c);
@@ -84,8 +104,10 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
   const R  = (o: Record<string, any>) => new mod.Rect({ selectable: true, evented: true, ...o });
   const T  = (text: string, o: Record<string, any>) => new mod.IText(text, { selectable: true, evented: true, ...o });
   const TB = (text: string, o: Record<string, any>) => new mod.Textbox(text, { selectable: true, evented: true, ...o });
-  const L  = (pts: number[], o: Record<string, any>) => new mod.Line(pts, { selectable: false, evented: false, ...o });
+  const L  = (x1: number, y1: number, x2: number, y2: number, o: Record<string, any>) =>
+    new mod.Line([x1, y1, x2, y2], { selectable: false, evented: false, ...o });
   const C  = (o: Record<string, any>) => new mod.Circle({ selectable: false, evented: false, ...o });
+  const y  = (v: number) => Math.round(v * ys);  // scale a y value
 
   const isDynamic = !!slideData;
   const titleText = slideData?.title ?? "";
@@ -95,112 +117,158 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
   // ── NOIR ──────────────────────────────────────────────────────────────────
   if (id === "noir") {
     bg("#0c0c0c");
-    add(R({ left: 1015, top: 60, width: 5, height: 960, fill: "#d4af37", selectable: false, evented: false }));
-    add(L([60, 88, 1000, 88], { stroke: "#d4af37", strokeWidth: 1 }));
-    add(T("CREATOR STUDIO", { left: 60, top: 42, fontFamily: "Arial", fontSize: 18, fill: "#d4af37", charSpacing: 280 }));
+    add(R({ left: 1015, top: y(60), width: 5, height: y(960), fill: "#d4af37", selectable: false, evented: false }));
+    add(L(lm, y(88), rm, y(88), { stroke: "#d4af37", strokeWidth: 1 }));
+    add(T("CREATOR STUDIO", { left: lm, top: y(42), fontFamily: "Arial", fontSize: 18, fill: "#d4af37", charSpacing: 280 }));
 
     if (isDynamic) {
-      add(TB(titleText, {
-        left: 60, top: 110, width: 920,
-        fontFamily: "Impact", fontSize: 110, fill: "#ffffff", lineHeight: 0.95,
-      }));
-      add(L([60, 640, 1000, 640], { stroke: "#d4af37", strokeWidth: 1 }));
-      add(TB(bodyText, {
-        left: 60, top: 666, width: 920,
-        fontFamily: "Georgia", fontSize: 36, fill: "#ffffff", opacity: 0.72, fontStyle: "italic",
-      }));
+      add(TB(titleText, { left: lm, top: y(110), width: rm - lm, fontFamily: "Impact", fontSize: 110, fill: "#ffffff", lineHeight: 0.95 }));
+      add(L(lm, y(640), rm, y(640), { stroke: "#d4af37", strokeWidth: 1 }));
+      add(TB(bodyText, { left: lm, top: y(666), width: rm - lm, fontFamily: "Georgia", fontSize: 36, fill: "#ffffff", opacity: 0.72, fontStyle: "italic" }));
     } else {
-      add(T("CREATE\nYOUR\nSTORY.", { left: 60, top: 110, fontFamily: "Impact", fontSize: 185, fill: "#ffffff", lineHeight: 0.88, charSpacing: -10 }));
-      add(L([60, 665, 1000, 665], { stroke: "#d4af37", strokeWidth: 1 }));
-      add(T("Turn your vision into reality.", { left: 60, top: 690, fontFamily: "Georgia", fontSize: 38, fill: "#ffffff", opacity: 0.7, fontStyle: "italic" }));
+      add(T("CREATE\nYOUR\nSTORY.", { left: lm, top: y(110), fontFamily: "Impact", fontSize: 185, fill: "#ffffff", lineHeight: 0.88, charSpacing: -10 }));
+      add(L(lm, y(665), rm, y(665), { stroke: "#d4af37", strokeWidth: 1 }));
+      add(T("Turn your vision into reality.", { left: lm, top: y(690), fontFamily: "Georgia", fontSize: 38, fill: "#ffffff", opacity: 0.7, fontStyle: "italic" }));
     }
 
-    add(T("@yourbrand", { left: 60, top: 970, fontFamily: "Arial", fontSize: 24, fill: "#d4af37", charSpacing: 100 }));
-    if (numLabel) add(T(numLabel, { left: 970, top: 42, fontFamily: "Arial", fontSize: 18, fill: "#d4af37", opacity: 0.6 }));
+    add(T("@yourbrand", { left: lm, top: bY, fontFamily: "Arial", fontSize: 24, fill: "#d4af37", charSpacing: 100 }));
+    if (numLabel) add(T(numLabel, { left: 970, top: y(42), fontFamily: "Arial", fontSize: 18, fill: "#d4af37", opacity: 0.6 }));
   }
 
   // ── SUNRISE ────────────────────────────────────────────────────────────────
   if (id === "sunrise") {
     bg("#ff4500");
-    add(C({ left: 580, top: -280, radius: 580, fill: "#ff7b00", opacity: 0.38 }));
-    add(C({ left: -280, top: 660, radius: 460, fill: "#cc2800", opacity: 0.38 }));
-    add(L([120, 185, 960, 185], { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
+    add(C({ left: 580, top: y(-280), radius: 580, fill: "#ff7b00", opacity: 0.38 }));
+    add(C({ left: -280, top: y(660), radius: 460, fill: "#cc2800", opacity: 0.38 }));
+    add(L(120, y(185), 960, y(185), { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
 
     if (isDynamic) {
-      add(TB(titleText, {
-        left: 540, top: 210, width: 840, originX: "center",
-        fontFamily: "Impact", fontSize: 130, fill: "#ffffff", textAlign: "center", lineHeight: 0.9,
-      }));
-      add(L([120, 700, 960, 700], { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
-      add(TB(bodyText, {
-        left: 540, top: 730, width: 840, originX: "center",
-        fontFamily: "Arial", fontSize: 32, fill: "#ffffff", textAlign: "center", charSpacing: 60, opacity: 0.9,
-      }));
+      add(TB(titleText, { left: cx, top: y(210), width: 840, originX: "center", fontFamily: "Impact", fontSize: 130, fill: "#ffffff", textAlign: "center", lineHeight: 0.9 }));
+      add(L(120, y(700), 960, y(700), { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
+      add(TB(bodyText, { left: cx, top: y(730), width: 840, originX: "center", fontFamily: "Arial", fontSize: 32, fill: "#ffffff", textAlign: "center", charSpacing: 60, opacity: 0.9 }));
     } else {
-      add(T("GOOD\nVIBES\nONLY", { left: 540, top: 210, originX: "center", fontFamily: "Impact", fontSize: 192, fill: "#ffffff", textAlign: "center", lineHeight: 0.85, charSpacing: -8 }));
-      add(L([120, 745, 960, 745], { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
-      add(T("#POSITIVEVIBES", { left: 540, top: 810, originX: "center", fontFamily: "Arial", fontSize: 30, fill: "#ffffff", charSpacing: 180, opacity: 0.85 }));
+      add(T("GOOD\nVIBES\nONLY", { left: cx, top: y(210), originX: "center", fontFamily: "Impact", fontSize: 192, fill: "#ffffff", textAlign: "center", lineHeight: 0.85, charSpacing: -8 }));
+      add(L(120, y(745), 960, y(745), { stroke: "#ffffff", strokeWidth: 2, opacity: 0.7 }));
+      add(T("#POSITIVEVIBES", { left: cx, top: y(810), originX: "center", fontFamily: "Arial", fontSize: 30, fill: "#ffffff", charSpacing: 180, opacity: 0.85 }));
     }
 
-    add(T("@yourbrand", { left: 540, top: 960, originX: "center", fontFamily: "Arial", fontSize: 26, fill: "#ffffff", opacity: 0.6 }));
-    if (numLabel) add(T(numLabel, { left: 60, top: 42, fontFamily: "Arial", fontSize: 22, fill: "#ffffff", opacity: 0.7 }));
+    add(T("@yourbrand", { left: cx, top: bY, originX: "center", fontFamily: "Arial", fontSize: 26, fill: "#ffffff", opacity: 0.6 }));
+    if (numLabel) add(T(numLabel, { left: lm, top: y(42), fontFamily: "Arial", fontSize: 22, fill: "#ffffff", opacity: 0.7 }));
   }
 
   // ── MINIMAL ────────────────────────────────────────────────────────────────
   if (id === "minimal") {
     bg("#ffffff");
-    add(R({ left: 0, top: 0, width: 50, height: 1080, fill: "#111111", selectable: false, evented: false }));
-    add(L([90, 130, 990, 130], { stroke: "#111111", strokeWidth: 2 }));
+    add(R({ left: 0, top: 0, width: 50, height: h, fill: "#111111", selectable: false, evented: false }));
+    const mlm = 90;
+    add(L(mlm, y(130), 990, y(130), { stroke: "#111111", strokeWidth: 2 }));
 
     if (isDynamic) {
-      add(TB(titleText, {
-        left: 90, top: 158, width: 890,
-        fontFamily: "Georgia", fontSize: 86, fill: "#111111", lineHeight: 1.1, fontStyle: "italic",
-      }));
-      add(TB(bodyText, {
-        left: 90, top: 460, width: 890,
-        fontFamily: "Georgia", fontSize: 42, fill: "#333333", lineHeight: 1.45, fontStyle: "italic",
-      }));
+      add(TB(titleText, { left: mlm, top: y(158), width: 890, fontFamily: "Georgia", fontSize: 86, fill: "#111111", lineHeight: 1.1, fontStyle: "italic" }));
+      add(TB(bodyText, { left: mlm, top: y(460), width: 890, fontFamily: "Georgia", fontSize: 42, fill: "#333333", lineHeight: 1.45, fontStyle: "italic" }));
     } else {
-      add(T("The time\nis now.", { left: 90, top: 160, fontFamily: "Georgia", fontSize: 110, fill: "#111111", lineHeight: 1.1, fontStyle: "italic" }));
-      add(T("Don't wait for the perfect\nmoment. Take the moment\nand make it perfect.", { left: 90, top: 480, fontFamily: "Georgia", fontSize: 44, fill: "#333333", lineHeight: 1.45, fontStyle: "italic" }));
+      add(T("The time\nis now.", { left: mlm, top: y(160), fontFamily: "Georgia", fontSize: 110, fill: "#111111", lineHeight: 1.1, fontStyle: "italic" }));
+      add(T("Don't wait for the perfect\nmoment. Take the moment\nand make it perfect.", { left: mlm, top: y(480), fontFamily: "Georgia", fontSize: 44, fill: "#333333", lineHeight: 1.45, fontStyle: "italic" }));
     }
 
-    add(L([90, 880, 990, 880], { stroke: "#111111", strokeWidth: 2 }));
-    add(T("— ZOEY MORGAN", { left: 90, top: 912, fontFamily: "Arial", fontSize: 22, fill: "#111111", charSpacing: 220 }));
-    add(R({ left: 90, top: 970, width: 50, height: 4, fill: "#111111", selectable: false, evented: false }));
-    if (numLabel) add(T(numLabel, { left: 940, top: 42, fontFamily: "Arial", fontSize: 22, fill: "#111111", opacity: 0.4 }));
+    add(L(mlm, y(880), 990, y(880), { stroke: "#111111", strokeWidth: 2 }));
+    add(T("— ZOEY MORGAN", { left: mlm, top: y(912), fontFamily: "Arial", fontSize: 22, fill: "#111111", charSpacing: 220 }));
+    add(R({ left: mlm, top: bY, width: 50, height: 4, fill: "#111111", selectable: false, evented: false }));
+    if (numLabel) add(T(numLabel, { left: 940, top: y(42), fontFamily: "Arial", fontSize: 22, fill: "#111111", opacity: 0.4 }));
   }
 
   // ── AURORA ─────────────────────────────────────────────────────────────────
   if (id === "aurora") {
     bg("#0d0021");
-    add(C({ left: 560, top: -260, radius: 510, fill: "#7c3aed", opacity: 0.22 }));
-    add(C({ left: -260, top: 650, radius: 470, fill: "#db2777", opacity: 0.19 }));
-    add(C({ left: 620, top: 650, radius: 180, fill: "#3b82f6", opacity: 0.14 }));
-    add(C({ left: 110, top: 108, radius: 38, fill: "#a78bfa", opacity: 0.55 }));
-    add(C({ left: 910, top: 910, radius: 28, fill: "#f472b6", opacity: 0.55 }));
-    add(T("DARE TO BE DIFFERENT", { left: 540, top: 140, originX: "center", fontFamily: "Arial", fontSize: 20, fill: "#c4b5fd", charSpacing: 240, opacity: 0.75 }));
-    add(L([200, 180, 880, 180], { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
+    add(C({ left: 560, top: y(-260), radius: 510, fill: "#7c3aed", opacity: 0.22 }));
+    add(C({ left: -260, top: y(650), radius: 470, fill: "#db2777", opacity: 0.19 }));
+    add(C({ left: 620, top: y(650), radius: 180, fill: "#3b82f6", opacity: 0.14 }));
+    add(C({ left: 110, top: y(108), radius: 38, fill: "#a78bfa", opacity: 0.55 }));
+    add(C({ left: 910, top: y(910), radius: 28, fill: "#f472b6", opacity: 0.55 }));
+    add(T("DARE TO BE DIFFERENT", { left: cx, top: y(140), originX: "center", fontFamily: "Arial", fontSize: 20, fill: "#c4b5fd", charSpacing: 240, opacity: 0.75 }));
+    add(L(200, y(180), 880, y(180), { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
 
     if (isDynamic) {
-      add(TB(titleText, {
-        left: 540, top: 240, width: 940, originX: "center",
-        fontFamily: "Impact", fontSize: 160, fill: "#ffffff", textAlign: "center", lineHeight: 0.88,
-      }));
-      add(L([200, 720, 880, 720], { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
-      add(TB(bodyText, {
-        left: 540, top: 750, width: 840, originX: "center",
-        fontFamily: "Georgia", fontSize: 42, fill: "#e9d5ff", fontStyle: "italic", textAlign: "center",
-      }));
+      add(TB(titleText, { left: cx, top: y(240), width: 940, originX: "center", fontFamily: "Impact", fontSize: 160, fill: "#ffffff", textAlign: "center", lineHeight: 0.88 }));
+      add(L(200, y(720), 880, y(720), { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
+      add(TB(bodyText, { left: cx, top: y(750), width: 840, originX: "center", fontFamily: "Georgia", fontSize: 42, fill: "#e9d5ff", fontStyle: "italic", textAlign: "center" }));
     } else {
-      add(T("BE\nBOLD.", { left: 540, top: 250, originX: "center", fontFamily: "Impact", fontSize: 248, fill: "#ffffff", textAlign: "center", lineHeight: 0.82, charSpacing: -8 }));
-      add(L([200, 740, 880, 740], { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
-      add(T("Greatness is a decision.", { left: 540, top: 775, originX: "center", fontFamily: "Georgia", fontSize: 44, fill: "#e9d5ff", fontStyle: "italic" }));
+      add(T("BE\nBOLD.", { left: cx, top: y(250), originX: "center", fontFamily: "Impact", fontSize: 248, fill: "#ffffff", textAlign: "center", lineHeight: 0.82, charSpacing: -8 }));
+      add(L(200, y(740), 880, y(740), { stroke: "#a78bfa", strokeWidth: 1, opacity: 0.4 }));
+      add(T("Greatness is a decision.", { left: cx, top: y(775), originX: "center", fontFamily: "Georgia", fontSize: 44, fill: "#e9d5ff", fontStyle: "italic" }));
     }
 
-    add(T("@yourbrand", { left: 540, top: 940, originX: "center", fontFamily: "Arial", fontSize: 24, fill: "#a78bfa", charSpacing: 150 }));
-    if (numLabel) add(T(numLabel, { left: 910, top: 140, fontFamily: "Arial", fontSize: 20, fill: "#a78bfa", opacity: 0.6 }));
+    add(T("@yourbrand", { left: cx, top: bY, originX: "center", fontFamily: "Arial", fontSize: 24, fill: "#a78bfa", charSpacing: 150 }));
+    if (numLabel) add(T(numLabel, { left: 910, top: y(140), fontFamily: "Arial", fontSize: 20, fill: "#a78bfa", opacity: 0.6 }));
+  }
+
+  // ── GRADIENT ──────────────────────────────────────────────────────────────
+  if (id === "gradient") {
+    bg("#0a0a1a");
+    add(C({ left: 864, top: y(-108), radius: 648, fill: "#312e81", opacity: 0.7 }));
+    add(C({ left: -216, top: y(756), radius: 540, fill: "#4f46e5", opacity: 0.5 }));
+    add(C({ left: 540, top: y(540), radius: 378, fill: "#7c3aed", opacity: 0.25 }));
+    add(L(lm, y(108), rm, y(108), { stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }));
+    add(T("CREATOR STUDIO", { left: cx, top: y(72), originX: "center", fontFamily: "Arial", fontSize: 16, fill: "#a5b4fc", charSpacing: 300 }));
+
+    if (isDynamic) {
+      add(TB(titleText, { left: cx, top: y(216), width: 920, originX: "center", fontFamily: "Impact", fontSize: 120, fill: "#ffffff", textAlign: "center", lineHeight: 0.92 }));
+      add(TB(bodyText, { left: cx, top: y(648), width: 810, originX: "center", fontFamily: "Georgia", fontSize: 38, fill: "#c7d2fe", fontStyle: "italic", textAlign: "center", lineHeight: 1.4 }));
+    } else {
+      add(T("LEVEL\nUP YOUR\nGAME.", { left: cx, top: y(216), originX: "center", fontFamily: "Impact", fontSize: 170, fill: "#ffffff", textAlign: "center", lineHeight: 0.85 }));
+      add(T("The difference between\nwhere you are and where\nyou want to be is action.", { left: cx, top: y(648), originX: "center", fontFamily: "Georgia", fontSize: 38, fill: "#c7d2fe", fontStyle: "italic", textAlign: "center", lineHeight: 1.4 }));
+    }
+
+    add(L(lm, y(950), rm, y(950), { stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }));
+    add(T("@yourbrand", { left: cx, top: bY, originX: "center", fontFamily: "Arial", fontSize: 22, fill: "#818cf8", charSpacing: 150 }));
+    if (numLabel) add(T(numLabel, { left: 940, top: y(65), fontFamily: "Arial", fontSize: 18, fill: "#a5b4fc", opacity: 0.7 }));
+  }
+
+  // ── STUDIO ────────────────────────────────────────────────────────────────
+  if (id === "studio") {
+    bg("#141414");
+    const accentH = Math.round(h * 0.04);
+    add(R({ left: 0, top: 0, width: w, height: accentH, fill: "#f97316", selectable: false, evented: false }));
+    add(R({ left: 0, top: h - accentH, width: w, height: accentH, fill: "#f97316", selectable: false, evented: false }));
+    const sm = 70;
+    add(T("Nº", { left: sm, top: y(75), fontFamily: "Georgia", fontSize: 42, fill: "#f97316", fontStyle: "italic" }));
+    add(L(sm, y(172), 540, y(172), { stroke: "#f97316", strokeWidth: 2 }));
+
+    if (isDynamic) {
+      add(TB(titleText, { left: sm, top: y(194), width: 940, fontFamily: "Impact", fontSize: 115, fill: "#ffffff", lineHeight: 0.9 }));
+      add(L(sm, y(626), 1004, y(626), { stroke: "#333333", strokeWidth: 1 }));
+      add(TB(bodyText, { left: sm, top: y(648), width: 940, fontFamily: "Arial", fontSize: 34, fill: "#cccccc", lineHeight: 1.5 }));
+    } else {
+      add(T("MAKE\nIT\nHAPPEN.", { left: sm, top: y(194), fontFamily: "Impact", fontSize: 188, fill: "#ffffff", lineHeight: 0.85 }));
+      add(L(sm, y(648), 1004, y(648), { stroke: "#333333", strokeWidth: 1 }));
+      add(T("Success isn't luck.\nIt's consistency over time.", { left: sm, top: y(670), fontFamily: "Arial", fontSize: 36, fill: "#aaaaaa", lineHeight: 1.5 }));
+    }
+
+    add(T("@yourbrand", { left: sm, top: Math.round(h * 0.885), fontFamily: "Arial", fontSize: 22, fill: "#f97316", charSpacing: 120 }));
+    if (numLabel) add(T(numLabel, { left: 940, top: Math.round(h * 0.885), fontFamily: "Arial", fontSize: 20, fill: "#555555" }));
+  }
+
+  // ── PASTEL ────────────────────────────────────────────────────────────────
+  if (id === "pastel") {
+    bg("#fff8f5");
+    add(C({ left: 778, top: y(-130), radius: 410, fill: "#fecdd3", opacity: 0.6 }));
+    add(C({ left: -108, top: y(778), radius: 346, fill: "#fed7aa", opacity: 0.5 }));
+    add(C({ left: 918, top: y(842), radius: 194, fill: "#fbcfe8", opacity: 0.45 }));
+    const pm = 80;
+    add(L(pm, y(113), 1000, y(113), { stroke: "#7c2d12", strokeWidth: 1, opacity: 0.2 }));
+    add(T("creator studio", { left: pm, top: y(70), fontFamily: "Georgia", fontSize: 18, fill: "#9a3412", fontStyle: "italic", opacity: 0.65 }));
+
+    if (isDynamic) {
+      add(TB(titleText, { left: pm, top: y(140), width: 920, fontFamily: "Georgia", fontSize: 96, fill: "#1c1917", lineHeight: 1.05, fontStyle: "italic" }));
+      add(TB(bodyText, { left: pm, top: y(540), width: 920, fontFamily: "Georgia", fontSize: 40, fill: "#44403c", lineHeight: 1.5, fontStyle: "italic" }));
+    } else {
+      add(T("slow\ndown &\ncreate.", { left: pm, top: y(140), fontFamily: "Georgia", fontSize: 120, fill: "#1c1917", lineHeight: 1.0, fontStyle: "italic" }));
+      add(T("Beauty is found in the quiet\nspaces between the chaos.\nMake time for what matters.", { left: pm, top: y(540), fontFamily: "Georgia", fontSize: 40, fill: "#44403c", lineHeight: 1.5, fontStyle: "italic" }));
+    }
+
+    add(L(pm, y(918), 1000, y(918), { stroke: "#7c2d12", strokeWidth: 1, opacity: 0.2 }));
+    add(T("@yourbrand", { left: pm, top: bY, fontFamily: "Georgia", fontSize: 22, fill: "#9a3412", fontStyle: "italic", opacity: 0.75 }));
+    if (numLabel) add(T(numLabel, { left: 940, top: y(67), fontFamily: "Arial", fontSize: 18, fill: "#9a3412", opacity: 0.45 }));
   }
 
   canvas.renderAll();
@@ -263,6 +331,7 @@ export default function CanvasEditorPage() {
   const [italic, setItalic]         = useState(false);
   const [textAlign, setTextAlign]   = useState<"left" | "center" | "right">("left");
   const [opacity, setOpacity]       = useState(100);
+  const [objBounds, setObjBounds]   = useState({ x: 0, y: 0, w: 0, h: 0 });
   const [brushSize, setBrushSize]   = useState(8);
   const [brushColor, setBrushColor] = useState("#000000");
   const [bgColor, setBgColor]       = useState("#ffffff");
@@ -284,6 +353,13 @@ export default function CanvasEditorPage() {
     histIdx.current = history.current.length - 1;
   }, []);
 
+  const syncBounds = (obj: any) => {
+    if (!obj) return;
+    const bw = Math.round((obj.width ?? 0) * (obj.scaleX ?? 1));
+    const bh = Math.round((obj.height ?? 0) * (obj.scaleY ?? 1));
+    setObjBounds({ x: Math.round(obj.left ?? 0), y: Math.round(obj.top ?? 0), w: bw, h: bh });
+  };
+
   const handleSelect = (e: any) => {
     const obj = e.selected?.[0];
     if (!obj) return;
@@ -291,6 +367,7 @@ export default function CanvasEditorPage() {
     const type: string = obj.type;
     setObjType(type);
     setOpacity(Math.round((obj.opacity ?? 1) * 100));
+    syncBounds(obj);
     if (type === "i-text" || type === "textbox") {
       setFontSize(obj.fontSize ?? 36);
       setFontFamily(obj.fontFamily ?? "Arial");
@@ -318,9 +395,10 @@ export default function CanvasEditorPage() {
       saveHistory();
       canvas.on("selection:created", handleSelect);
       canvas.on("selection:updated", handleSelect);
-      canvas.on("selection:cleared", () => { setSelectedObj(null); setObjType(""); });
+      canvas.on("selection:cleared", () => { setSelectedObj(null); setObjType(""); setObjBounds({ x: 0, y: 0, w: 0, h: 0 }); });
       canvas.on("object:added",    () => { if (!skipHistory.current) saveHistory(); });
-      canvas.on("object:modified", saveHistory);
+      canvas.on("object:modified", (e: any) => { saveHistory(); if (e.target) syncBounds(e.target); });
+      canvas.on("object:moving",   (e: any) => { if (e.target) syncBounds(e.target); });
       canvas.on("object:removed",  saveHistory);
     });
     return () => { canvas?.dispose(); fc.current = null; };
@@ -702,6 +780,17 @@ export default function CanvasEditorPage() {
     e.target.value = "";
   };
 
+  const duplicateObject = () => {
+    const obj = fc.current?.getActiveObject();
+    if (!obj) return;
+    obj.clone().then((clone: any) => {
+      clone.set({ left: (obj.left ?? 0) + 20, top: (obj.top ?? 0) + 20 });
+      fc.current?.add(clone);
+      fc.current?.setActiveObject(clone);
+      fc.current?.renderAll();
+    });
+  };
+
   const updateProp = (props: Record<string, any>) => {
     const obj = fc.current?.getActiveObject();
     if (!obj) return;
@@ -877,11 +966,17 @@ export default function CanvasEditorPage() {
         <div className="p-3 space-y-4">
 
           {!selectedObj && activeTool !== "draw" && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground">Background</label>
               <div className="flex items-center gap-2">
                 <input type="color" value={bgColor} onChange={e => updateBg(e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-border" />
                 <span className="text-xs font-mono text-muted-foreground">{bgColor}</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {COLOR_SWATCHES.map(c => (
+                  <button key={c} title={c} onClick={() => updateBg(c)}
+                    style={{ background: c }} className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform" />
+                ))}
               </div>
             </div>
           )}
@@ -900,43 +995,64 @@ export default function CanvasEditorPage() {
           )}
 
           {selectedObj && (
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Opacity: {opacity}%</label>
-              <input type="range" min={0} max={100} value={opacity} onChange={e => {
-                const v = +e.target.value;
-                setOpacity(v);
-                updateProp({ opacity: v / 100 });
-              }} className="w-full accent-primary" />
-            </div>
-          )}
+            <>
+              {/* Position & size */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Position / Size</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {[["X", objBounds.x], ["Y", objBounds.y], ["W", objBounds.w], ["H", objBounds.h]].map(([k, v]) => (
+                    <div key={k} className="flex items-center gap-1 h-7 px-2 rounded-md border border-border bg-muted/20">
+                      <span className="text-[9px] text-muted-foreground font-medium w-3">{k}</span>
+                      <span className="text-xs text-foreground font-mono">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-          {selectedObj && (
-            <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Layer</label>
+              {/* Duplicate + layer */}
               <div className="flex gap-1.5">
-                <button
-                  onClick={() => { fc.current?.bringObjectToFront(fc.current.getActiveObject()); fc.current?.renderAll(); }}
+                <button onClick={duplicateObject}
+                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+                  <Copy className="w-3 h-3" />Copy
+                </button>
+                <button onClick={() => { fc.current?.bringObjectToFront(fc.current.getActiveObject()); fc.current?.renderAll(); }}
                   title="Bring to front"
-                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"
-                >
+                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
                   <BringToFront className="w-3 h-3" />Front
                 </button>
-                <button
-                  onClick={() => { fc.current?.sendObjectToBack(fc.current.getActiveObject()); fc.current?.renderAll(); }}
+                <button onClick={() => { fc.current?.sendObjectToBack(fc.current.getActiveObject()); fc.current?.renderAll(); }}
                   title="Send to back"
-                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors"
-                >
+                  className="flex-1 flex items-center justify-center gap-1 h-7 rounded-md border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
                   <SendToBack className="w-3 h-3" />Back
                 </button>
               </div>
-            </div>
+
+              {/* Opacity */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">Opacity: {opacity}%</label>
+                <input type="range" min={0} max={100} value={opacity} onChange={e => {
+                  const v = +e.target.value;
+                  setOpacity(v);
+                  updateProp({ opacity: v / 100 });
+                }} className="w-full accent-primary" />
+              </div>
+            </>
           )}
 
           {isTextObj && (
             <>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Color</label>
-                <input type="color" value={fillStr} onChange={e => { setFill(e.target.value); updateProp({ fill: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                <div className="flex items-center gap-2">
+                  <input type="color" value={fillStr} onChange={e => { setFill(e.target.value); updateProp({ fill: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <span className="text-xs font-mono text-muted-foreground">{fillStr}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {COLOR_SWATCHES.map(c => (
+                    <button key={c} title={c} onClick={() => { setFill(c); updateProp({ fill: c }); }}
+                      style={{ background: c }} className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform" />
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Font</label>
@@ -972,13 +1088,25 @@ export default function CanvasEditorPage() {
 
           {isShapeObj && (
             <>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Fill</label>
-                <input type="color" value={fillStr} onChange={e => { setFill(e.target.value); updateProp({ fill: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                <div className="flex items-center gap-2">
+                  <input type="color" value={fillStr} onChange={e => { setFill(e.target.value); updateProp({ fill: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <span className="text-xs font-mono text-muted-foreground">{fillStr}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {COLOR_SWATCHES.map(c => (
+                    <button key={c} title={c} onClick={() => { setFill(c); updateProp({ fill: c }); }}
+                      style={{ background: c }} className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform" />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Stroke</label>
-                <input type="color" value={strokeStr} onChange={e => { setStroke(e.target.value); updateProp({ stroke: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                <div className="flex items-center gap-2">
+                  <input type="color" value={strokeStr} onChange={e => { setStroke(e.target.value); updateProp({ stroke: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <span className="text-xs font-mono text-muted-foreground">{strokeStr}</span>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Stroke width</label>
@@ -989,9 +1117,18 @@ export default function CanvasEditorPage() {
 
           {isLineObj && (
             <>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Color</label>
-                <input type="color" value={strokeStr} onChange={e => { setStroke(e.target.value); updateProp({ stroke: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                <div className="flex items-center gap-2">
+                  <input type="color" value={strokeStr} onChange={e => { setStroke(e.target.value); updateProp({ stroke: e.target.value }); }} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <span className="text-xs font-mono text-muted-foreground">{strokeStr}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {COLOR_SWATCHES.map(c => (
+                    <button key={c} title={c} onClick={() => { setStroke(c); updateProp({ stroke: c }); }}
+                      style={{ background: c }} className="w-5 h-5 rounded-full border border-white/20 hover:scale-110 transition-transform" />
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Width</label>
