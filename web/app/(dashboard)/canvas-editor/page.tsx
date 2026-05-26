@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   MousePointer2, Type, Square, Circle as CircleIcon, Minus, Pen,
   ImagePlus, Download, Trash2, RotateCcw, RotateCw,
   LayoutTemplate, X, Loader2, Plus, Copy, Sparkles,
   AlignLeft, AlignCenter, AlignRight, BringToFront, SendToBack,
+  Smartphone, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { motion } from "motion/react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,6 +283,7 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CanvasEditorPage() {
+  const router          = useRouter();
   const canvasEl        = useRef<HTMLCanvasElement>(null);
   const fc              = useRef<any>(null);
   const fabricMod       = useRef<any>(null);
@@ -311,6 +316,14 @@ export default function CanvasEditorPage() {
   const [thumbnails, setThumbnails]     = useState<Record<string, string>>({});
   const [thumbsLoading, setThumbsLoading] = useState(false);
   const thumbsGenerated                 = useRef(false);
+
+  // ── UI panel state ────────────────────────────────────────────────────────
+  const [leftOpen, setLeftOpen]           = useState(true);
+  const [rightOpen, setRightOpen]         = useState(true);
+  const [previewOpen, setPreviewOpen]     = useState(false);
+  const [hasUnsaved, setHasUnsaved]       = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [pendingNavUrl, setPendingNavUrl] = useState<string | null>(null);
 
   // ── AI panel state ────────────────────────────────────────────────────────
   const [aiTopic, setAiTopic]             = useState("");
@@ -396,10 +409,10 @@ export default function CanvasEditorPage() {
       canvas.on("selection:created", handleSelect);
       canvas.on("selection:updated", handleSelect);
       canvas.on("selection:cleared", () => { setSelectedObj(null); setObjType(""); setObjBounds({ x: 0, y: 0, w: 0, h: 0 }); });
-      canvas.on("object:added",    () => { if (!skipHistory.current) saveHistory(); });
-      canvas.on("object:modified", (e: any) => { saveHistory(); if (e.target) syncBounds(e.target); });
+      canvas.on("object:added",    () => { if (!skipHistory.current) saveHistory(); setHasUnsaved(true); });
+      canvas.on("object:modified", (e: any) => { saveHistory(); if (e.target) syncBounds(e.target); setHasUnsaved(true); });
       canvas.on("object:moving",   (e: any) => { if (e.target) syncBounds(e.target); });
-      canvas.on("object:removed",  saveHistory);
+      canvas.on("object:removed",  () => { saveHistory(); setHasUnsaved(true); });
     });
     return () => { canvas?.dispose(); fc.current = null; };
   }, [saveHistory]);
@@ -730,6 +743,18 @@ export default function CanvasEditorPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // ── beforeunload guard ────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsaved]);
+
   const undo = () => {
     if (histIdx.current <= 0 || !fc.current) return;
     histIdx.current--;
@@ -805,11 +830,12 @@ export default function CanvasEditorPage() {
     fc.current.renderAll();
   };
 
-  const isTextObj  = objType === "i-text" || objType === "textbox";
-  const isShapeObj = ["rect", "circle", "triangle", "ellipse"].includes(objType);
-  const isLineObj  = objType === "line";
-  const fillStr    = typeof fill === "string" && fill.startsWith("#") ? fill : "#6366f1";
-  const strokeStr  = stroke.startsWith("#") ? stroke : "#000000";
+  const isTextObj     = objType === "i-text" || objType === "textbox";
+  const isShapeObj    = ["rect", "circle", "triangle", "ellipse"].includes(objType);
+  const isLineObj     = objType === "line";
+  const fillStr       = typeof fill === "string" && fill.startsWith("#") ? fill : "#6366f1";
+  const strokeStr     = stroke.startsWith("#") ? stroke : "#000000";
+  const currentSlideId = slides[0]?.id ?? 'default';
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -819,43 +845,58 @@ export default function CanvasEditorPage() {
     <div className="flex h-full relative">
 
       {/* ── Tool sidebar ─────────────────────────────────────────────────── */}
-      <aside className="w-[68px] shrink-0 border-r border-border flex flex-col items-center py-3 gap-0.5 bg-background z-10">
-        {TOOLS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            title={label}
-            onClick={() => setActiveTool(id)}
-            className={cn(
-              "flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors gap-0.5",
-              activeTool === id
-                ? "bg-primary/20 text-primary ring-1 ring-primary/30"
-                : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
-            )}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="text-[9px] font-medium leading-none">{label}</span>
+      <motion.aside
+        animate={{ width: leftOpen ? 68 : 0, opacity: leftOpen ? 1 : 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="overflow-hidden shrink-0 flex flex-col border-r border-[#222] bg-[#141414]"
+      >
+        <div className="w-[68px] flex flex-col items-center py-3 gap-0.5 h-full">
+          {TOOLS.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              title={label}
+              onClick={() => setActiveTool(id)}
+              className={cn(
+                "flex flex-col items-center justify-center w-14 h-12 rounded-lg transition-colors gap-0.5",
+                activeTool === id
+                  ? "bg-primary/20 text-primary ring-1 ring-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07]"
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="text-[9px] font-medium leading-none">{label}</span>
+            </button>
+          ))}
+          <div className="h-px w-8 bg-border my-1" />
+          <button title="Upload image" onClick={() => fileInputRef.current?.click()}
+            className="flex flex-col items-center justify-center w-14 h-12 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+            <ImagePlus className="w-4 h-4" />
+            <span className="text-[9px] font-medium leading-none">Image</span>
           </button>
-        ))}
-        <div className="h-px w-8 bg-border my-1" />
-        <button title="Upload image" onClick={() => fileInputRef.current?.click()}
-          className="flex flex-col items-center justify-center w-14 h-12 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
-          <ImagePlus className="w-4 h-4" />
-          <span className="text-[9px] font-medium leading-none">Image</span>
-        </button>
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-        <div className="mt-auto flex flex-col gap-0.5">
-          <button title="Undo (Ctrl+Z)" onClick={undo}
-            className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-medium leading-none">Undo</span>
-          </button>
-          <button title="Redo (Ctrl+Y)" onClick={redo}
-            className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
-            <RotateCw className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-medium leading-none">Redo</span>
-          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+          <div className="mt-auto flex flex-col gap-0.5">
+            <button title="Undo (Ctrl+Z)" onClick={undo}
+              className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-medium leading-none">Undo</span>
+            </button>
+            <button title="Redo (Ctrl+Y)" onClick={redo}
+              className="flex flex-col items-center justify-center w-14 h-10 rounded-lg gap-0.5 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.07] transition-colors">
+              <RotateCw className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-medium leading-none">Redo</span>
+            </button>
+          </div>
         </div>
-      </aside>
+      </motion.aside>
+
+      {/* Left panel toggle button */}
+      <button
+        onClick={() => setLeftOpen(v => !v)}
+        className="absolute top-1/2 -translate-y-1/2 z-20 w-4 h-8 bg-[#1e1e1e] border border-[#222] rounded-r flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+        style={{ left: leftOpen ? 68 : 0, transition: 'left 0.3s' }}
+      >
+        {leftOpen ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+      </button>
 
       {/* ── Canvas area ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -886,6 +927,30 @@ export default function CanvasEditorPage() {
             <span className="text-xs text-muted-foreground font-mono hidden sm:inline">{canvW} × {canvH}</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setPreviewOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors h-7"
+            >
+              <Smartphone className="w-3.5 h-3.5" /> Preview
+            </button>
+            <button
+              onClick={() => {
+                if (!fc.current) return;
+                const json = JSON.stringify(fc.current.toJSON());
+                localStorage.setItem(`canvas_slide_${currentSlideId}`, json);
+                setHasUnsaved(false);
+                toast.success('Saved to browser storage');
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 h-7 text-xs rounded-lg transition-all font-medium",
+                hasUnsaved
+                  ? "bg-primary text-primary-foreground hover:brightness-110"
+                  : "border border-border text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {hasUnsaved ? 'Save changes' : 'Saved'}
+            </button>
+            <div className="h-3 w-px bg-border mx-0.5" />
             <button onClick={handleClear} className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-xs text-muted-foreground hover:text-red-400 hover:bg-red-500/[0.07] transition-colors">
               <Trash2 className="w-3.5 h-3.5" />Clear
             </button>
@@ -958,8 +1023,22 @@ export default function CanvasEditorPage() {
         </div>
       </div>
 
+      {/* Right panel toggle button */}
+      <button
+        onClick={() => setRightOpen(v => !v)}
+        className="absolute top-1/2 -translate-y-1/2 z-20 w-4 h-8 bg-[#1e1e1e] border border-[#222] rounded-l flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+        style={{ right: rightOpen ? 224 : 0, transition: 'right 0.3s' }}
+      >
+        {rightOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+      </button>
+
       {/* ── Properties panel ─────────────────────────────────────────────── */}
-      <aside className="w-56 shrink-0 border-l border-border overflow-y-auto bg-background">
+      <motion.aside
+        animate={{ width: rightOpen ? 224 : 0, opacity: rightOpen ? 1 : 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="overflow-hidden shrink-0 border-l border-border bg-background"
+      >
+      <div className="w-56 h-full overflow-y-auto">
         <div className="p-3 border-b border-border">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Properties</p>
         </div>
@@ -1158,7 +1237,119 @@ export default function CanvasEditorPage() {
             <p className="text-xs text-muted-foreground text-center pt-4">Click on the canvas to place</p>
           )}
         </div>
-      </aside>
+      </div>
+      </motion.aside>
+
+      {/* ── Instagram phone preview modal ────────────────────────────────── */}
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewOpen(false)}
+        >
+          <div
+            className="relative"
+            style={{ width: 320, height: 640 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Phone frame */}
+            <div className="absolute inset-0 rounded-[40px] bg-zinc-900 ring-4 ring-zinc-700 shadow-2xl overflow-hidden">
+              {/* Status bar */}
+              <div className="h-8 bg-zinc-950 flex items-center justify-between px-6">
+                <span className="text-[9px] text-white font-medium">9:41</span>
+                <div className="w-20 h-4 bg-zinc-900 rounded-full" />
+                <div className="flex gap-1">
+                  <div className="w-3 h-2 bg-white/50 rounded-sm" />
+                  <div className="w-1.5 h-2 bg-white/50 rounded-sm" />
+                </div>
+              </div>
+              {/* IG header */}
+              <div className="h-10 bg-black flex items-center justify-between px-4 border-b border-zinc-800">
+                <span className="text-white text-xs font-semibold">@yourhandle</span>
+                <div className="flex gap-2">
+                  <div className="w-4 h-4 rounded-full bg-zinc-700" />
+                  <div className="w-4 h-4 rounded-full bg-zinc-700" />
+                </div>
+              </div>
+              {/* Canvas preview inside phone */}
+              <div className="bg-zinc-950 flex items-center justify-center overflow-hidden" style={{ height: 'calc(100% - 120px)' }}>
+                <canvas
+                  ref={(el) => {
+                    if (el && fc.current) {
+                      const ctx = el.getContext('2d');
+                      if (ctx) {
+                        const dataURL = fc.current.toDataURL({ format: 'jpeg', quality: 0.85, multiplier: 0.3 });
+                        const img = new Image();
+                        img.onload = () => {
+                          el.width = 280;
+                          el.height = 280;
+                          ctx.drawImage(img, 0, 0, 280, 280);
+                        };
+                        img.src = dataURL;
+                      }
+                    }
+                  }}
+                  style={{ width: 280, height: 280, objectFit: 'cover' }}
+                />
+              </div>
+              {/* IG bottom actions */}
+              <div className="h-10 bg-black flex items-center justify-around px-6 border-t border-zinc-800">
+                {['♡', '💬', '↗', '🔖'].map((icon) => (
+                  <span key={icon} className="text-white text-sm">{icon}</span>
+                ))}
+              </div>
+              {/* Home indicator */}
+              <div className="h-8 bg-zinc-950 flex items-center justify-center">
+                <div className="w-24 h-1 bg-zinc-600 rounded-full" />
+              </div>
+            </div>
+            {/* Close */}
+            <button
+              onClick={() => setPreviewOpen(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-white hover:bg-zinc-700 transition-colors text-sm"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save/discard dialog ───────────────────────────────────────────── */}
+      {showSaveDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-foreground font-semibold mb-2">Unsaved changes</h3>
+            <p className="text-muted-foreground text-sm mb-5">
+              You have unsaved changes. Save them before leaving?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowSaveDialog(false);
+                  setHasUnsaved(false);
+                  if (pendingNavUrl) router.push(pendingNavUrl);
+                }}
+                className="flex-1 px-4 py-2 text-sm border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => {
+                  if (fc.current) {
+                    const json = JSON.stringify(fc.current.toJSON());
+                    localStorage.setItem(`canvas_slide_${currentSlideId}`, json);
+                  }
+                  setShowSaveDialog(false);
+                  setHasUnsaved(false);
+                  if (pendingNavUrl) router.push(pendingNavUrl);
+                }}
+                className="flex-1 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all font-medium"
+              >
+                Save & leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Template gallery overlay ──────────────────────────────────────── */}
       {showTemplates && (
