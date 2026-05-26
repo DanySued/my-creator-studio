@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         content: body.content,
         slide_count: body.slideCount || 5,
-        theme: body.theme || 'midnight',
+        theme: body.theme || 'thread',
         title: body.title || 'Generated Carousel',
         tone: body.tone || 'professional',
       }),

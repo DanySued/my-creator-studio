@@ -33,7 +33,7 @@ class Carousel(BaseModel):
     """Stores carousel generation history and metadata."""
     id = CharField(primary_key=True)
     title = CharField()
-    theme = CharField(default="midnight")
+    theme = CharField(default="thread")
     slide_count = IntegerField()
     created_at = DateTimeField(default=datetime.now)
 

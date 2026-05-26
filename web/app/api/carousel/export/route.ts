@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         carousel_id: body.carouselId,
-        theme: body.theme || 'midnight',
+        theme: body.theme || 'thread',
         slides: body.slides,
       }),
     });

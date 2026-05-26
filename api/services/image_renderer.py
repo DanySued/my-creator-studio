@@ -44,6 +44,7 @@ OVERLAY_ALPHA = 204           # 80 % of 255
 
 PADDING_X = 108               # ~10 % of width  (81/810 × 1080)
 PADDING_TOP = 120
+STRIPE_W = 54                 # continuity stripe width (px)
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets" / "fonts"
 FONT_BOLD   = ASSETS_DIR / "Montserrat-Bold.ttf"
@@ -51,39 +52,39 @@ FONT_SEMI   = ASSETS_DIR / "Montserrat-SemiBold.ttf"
 FONT_REGULAR = ASSETS_DIR / "Montserrat-Regular.ttf"
 
 # ── Color themes (for gradient-background slides) ────────────────────────────
+# Each theme carries a stripe color (continuity bar between slides) and a
+# slideStyle hint used for watermark number rendering.
 
 THEMES: dict[str, dict] = {
-    "midnight": {
-        "bg1": (15, 12, 41), "bg2": (48, 43, 99),
-        "accent": (167, 139, 250), "title": (255, 255, 255), "body": (210, 205, 255),
+    "thread": {
+        "bg1": (249, 246, 241), "bg2": (237, 232, 224),
+        "accent": (26, 26, 26), "title": (13, 13, 13), "body": (90, 90, 90),
+        "stripe": (200, 184, 154), "style": "editorial",
     },
-    "ocean": {
-        "bg1": (26, 35, 126), "bg2": (0, 131, 143),
-        "accent": (128, 222, 234), "title": (255, 255, 255), "body": (200, 240, 245),
+    "noir": {
+        "bg1": (12, 12, 12), "bg2": (28, 28, 28),
+        "accent": (212, 168, 83), "title": (255, 255, 255), "body": (200, 195, 175),
+        "stripe": (212, 168, 83), "style": "bold-number",
     },
-    "sunset": {
-        "bg1": (191, 54, 12), "bg2": (245, 127, 23),
-        "accent": (255, 204, 2), "title": (255, 255, 255), "body": (255, 235, 180),
+    "bloom": {
+        "bg1": (240, 232, 255), "bg2": (220, 200, 255),
+        "accent": (124, 58, 237), "title": (30, 10, 60), "body": (74, 44, 138),
+        "stripe": (124, 58, 237), "style": "classic",
     },
-    "minimal": {
-        "bg1": (250, 250, 250), "bg2": (230, 230, 230),
-        "accent": (26, 26, 26), "title": (26, 26, 26), "body": (80, 80, 80),
+    "navy": {
+        "bg1": (8, 20, 46), "bg2": (20, 48, 90),
+        "accent": (201, 168, 76), "title": (255, 255, 255), "body": (200, 215, 235),
+        "stripe": (201, 168, 76), "style": "bold-number",
     },
-    "neon": {
-        "bg1": (10, 10, 10), "bg2": (26, 26, 26),
-        "accent": (57, 255, 20), "title": (255, 255, 255), "body": (200, 200, 200),
+    "plasma": {
+        "bg1": (4, 4, 4), "bg2": (12, 12, 20),
+        "accent": (0, 229, 255), "title": (255, 255, 255), "body": (180, 240, 255),
+        "stripe": (0, 229, 255), "style": "bold-number",
     },
-    "forest": {
-        "bg1": (27, 94, 32), "bg2": (46, 125, 50),
-        "accent": (165, 214, 167), "title": (255, 255, 255), "body": (200, 235, 200),
-    },
-    "coral": {
-        "bg1": (183, 28, 28), "bg2": (230, 74, 25),
-        "accent": (255, 204, 188), "title": (255, 255, 255), "body": (255, 220, 210),
-    },
-    "charcoal": {
-        "bg1": (33, 33, 33), "bg2": (66, 66, 66),
-        "accent": (189, 189, 189), "title": (255, 255, 255), "body": (200, 200, 200),
+    "clay": {
+        "bg1": (247, 237, 226), "bg2": (232, 213, 192),
+        "accent": (196, 94, 61), "title": (45, 24, 16), "body": (107, 69, 53),
+        "stripe": (196, 94, 61), "style": "editorial",
     },
 }
 
@@ -336,7 +337,7 @@ def render_slide_themed(
     slide_type: str,           # "cover" | "content" | "cta"
     title: str,
     body: str = "",
-    theme: str = "midnight",
+    theme: str = "thread",
     top_label: str = "",
     slide_num: int = 1,
     total_slides: int = 5,
@@ -346,12 +347,23 @@ def render_slide_themed(
     """
     Render a single carousel slide using a color gradient theme.
     No photo required — background is generated from the theme palette.
+    Each slide carries continuity stripes on its edges so the carousel
+    feels connected when swiped on Instagram.
     """
-    colors = THEMES.get(theme, THEMES["midnight"])
+    colors = THEMES.get(theme, THEMES["thread"])
 
     bg = _make_gradient_bg(canvas_w, canvas_h, colors["bg1"], colors["bg2"])
     canvas = bg.copy()
     draw = ImageDraw.Draw(canvas)
+
+    # ── Continuity stripes ───────────────────────────────────────────────────
+    stripe_color = colors.get("stripe", (200, 200, 200))
+    # Left stripe: content + cta slides (they follow another slide)
+    if slide_type in ("content", "cta"):
+        draw.rectangle([0, 0, STRIPE_W - 1, canvas_h - 1], fill=stripe_color)
+    # Right stripe: cover + content slides (another slide follows them)
+    if slide_type in ("cover", "content"):
+        draw.rectangle([canvas_w - STRIPE_W, 0, canvas_w - 1, canvas_h - 1], fill=stripe_color)
 
     font_title_large  = _load_font(FONT_BOLD,    96)
     font_title_medium = _load_font(FONT_BOLD,    72)
@@ -365,32 +377,60 @@ def render_slide_themed(
     a_color = colors["accent"]
     text_area_w = canvas_w - 2 * PADDING_X
 
+    # ── Watermark number (bold-number themes) ────────────────────────────────
+    if colors.get("style") == "bold-number" and slide_type != "cta":
+        num_label = str(slide_num).zfill(2)
+        font_wm = _load_font(FONT_BOLD, 420)
+        bbox = draw.textbbox((0, 0), num_label, font=font_wm)
+        wm_w = bbox[2] - bbox[0]
+        # Anchor to lower-right, inside the right stripe
+        wm_x = canvas_w - STRIPE_W - 20 - wm_w
+        wm_y = int(canvas_h * 0.60)
+        draw.text((wm_x, wm_y), num_label, font=font_wm, fill=(*a_color, 23))
+
     if slide_type == "cover":
         if top_label:
-            draw.text((PADDING_X, PADDING_TOP), top_label.upper(), font=font_label, fill=a_color)
-        title_y = int(canvas_h * 0.28)
-        title_end_y = _draw_wrapped_text(draw, title, font_title_large, t_color, PADDING_X, title_y, text_area_w, line_spacing=16)
-        sep_y = title_end_y + 30
-        draw.rectangle([PADDING_X, sep_y, PADDING_X + text_area_w // 2, sep_y + 3], fill=a_color)
+            draw.text((PADDING_X, PADDING_TOP), top_label, font=font_label, fill=a_color)
+        # Number label top-left
+        num_label = str(slide_num).zfill(2)
+        draw.text((PADDING_X, PADDING_TOP), num_label, font=font_label, fill=(*a_color, 230))
+        title_y = int(canvas_h * 0.25)
+        title_end_y = _draw_wrapped_text(
+            draw, title, font_title_large, t_color, PADDING_X, title_y, text_area_w, line_spacing=16
+        )
+        sep_y = int(canvas_h * 0.62)
+        draw.rectangle([PADDING_X, sep_y, PADDING_X + 320, sep_y + 3], fill=a_color)
         if body:
-            _draw_wrapped_text(draw, body, font_body, b_color, PADDING_X, int(canvas_h * 0.78), text_area_w, line_spacing=10)
+            _draw_wrapped_text(
+                draw, body, font_body, b_color, PADDING_X, int(canvas_h * 0.67), text_area_w, line_spacing=10
+            )
 
     elif slide_type == "content":
+        num_label = str(slide_num).zfill(2)
+        draw.text((PADDING_X, PADDING_TOP), num_label, font=font_label, fill=(*a_color, 230))
         if top_label:
-            draw.text((PADDING_X, PADDING_TOP), top_label.upper(), font=font_label, fill=a_color)
-        title_y = int(canvas_h * 0.22)
-        title_end_y = _draw_wrapped_text(draw, title, font_title_small, t_color, PADDING_X, title_y, text_area_w, line_spacing=14)
-        sep_y = title_end_y + 28
-        draw.rectangle([PADDING_X, sep_y, PADDING_X + text_area_w // 3, sep_y + 3], fill=a_color)
-        body_y = sep_y + 36
+            # Place handle top-right (inside right stripe boundary)
+            bbox = draw.textbbox((0, 0), top_label, font=font_label)
+            lw = bbox[2] - bbox[0]
+            draw.text((canvas_w - STRIPE_W - PADDING_X // 2 - lw, PADDING_TOP), top_label, font=font_label, fill=(*a_color, 190))
+        title_y = int(canvas_h * 0.20)
+        title_end_y = _draw_wrapped_text(
+            draw, title, font_title_small, t_color, PADDING_X, title_y, text_area_w, line_spacing=14
+        )
+        sep_y = int(canvas_h * 0.48)
+        draw.rectangle([PADDING_X, sep_y, PADDING_X + 270, sep_y + 3], fill=a_color)
+        body_y = int(canvas_h * 0.53)
         _draw_wrapped_text(draw, body, font_body, b_color, PADDING_X, body_y, text_area_w, line_spacing=14)
         _draw_slide_number(draw, slide_num, total_slides, font_counter)
 
     elif slide_type == "cta":
-        if top_label:
-            draw.text((PADDING_X, PADDING_TOP), top_label.upper(), font=font_label, fill=a_color)
-        cta_y = int(canvas_h * 0.40)
+        # Large left-aligned CTA with handle below
+        cta_y = int(canvas_h * 0.38)
         _draw_wrapped_text(draw, title, font_title_medium, t_color, PADDING_X, cta_y, text_area_w, line_spacing=16)
+        sep_y = int(canvas_h * 0.63)
+        draw.rectangle([PADDING_X, sep_y, PADDING_X + 240, sep_y + 3], fill=a_color)
+        if top_label:
+            draw.text((PADDING_X, int(canvas_h * 0.68)), top_label, font=font_label, fill=a_color)
 
     out = io.BytesIO()
     canvas.convert("RGB").save(out, format="PNG", optimize=True)
@@ -426,7 +466,7 @@ def render_carousel(
 
 def render_carousel_themed(
     slides: list,
-    theme: str = "midnight",
+    theme: str = "thread",
     top_label: str = "",
     canvas_w: int = CANVAS_W,
     canvas_h: int = CANVAS_H,

@@ -12,7 +12,7 @@ const toLabel = (n: number) => String(n).padStart(2, '0');
 
 export default function CarouselPage() {
   const [rawText, setRawText] = useState('');
-  const [themeId, setThemeId] = useState('midnight');
+  const [themeId, setThemeId] = useState('thread');
   const [handle, setHandle] = useState('');
   const [slideCount, setSlideCount] = useState<number | null>(null);
   const [slides, setSlides] = useState<Slide[]>([]);

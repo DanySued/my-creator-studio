@@ -14,7 +14,7 @@ class CarouselGenerateRequest(BaseModel):
     """Request to generate a carousel from document content."""
     content: str  # Extracted text from document
     slide_count: int = 5  # Number of slides to generate
-    theme: str = "midnight"
+    theme: str = "thread"
     title: str = "Generated Carousel"
     tone: str = "professional"
 
@@ -33,7 +33,7 @@ class PexelsPhotoSearchResponse(BaseModel):
 class CarouselExportRequest(BaseModel):
     """Request to export slides as PNG ZIP."""
     carousel_id: str
-    theme: str = "midnight"
+    theme: str = "thread"
     slides: List[SlideData]
 
 
@@ -94,7 +94,7 @@ class CarouselSlideItem(BaseModel):
 class CarouselFromTextRequest(BaseModel):
     """Generate a carousel from pasted raw text."""
     raw_text: str
-    theme: str = "midnight"
+    theme: str = "thread"
     handle: str = ""
     font: str = "inter"
     size: str = "1080x1350"
@@ -111,7 +111,7 @@ class CarouselRenderRequest(BaseModel):
     """Render themed PNG slides and return as ZIP."""
     carousel_id: Optional[str] = None
     slides: List[CarouselSlideItem]
-    theme: str = "midnight"
+    theme: str = "thread"
     handle: str = ""
     size: str = "1080x1350"
 

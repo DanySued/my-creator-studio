@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         raw_text: body.rawText,
-        theme: body.theme || 'midnight',
+        theme: body.theme || 'thread',
         handle: body.handle || '',
         slide_count: body.slideCount || null,
         tone: body.tone || 'casual',
