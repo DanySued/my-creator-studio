@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { SlideCard, Slide } from '@/components/carousel/SlideCard';
+import { SlideCard, type Slide } from '@/components/carousel/SlideCard';
 import { getTheme } from '@/lib/carouselThemes';
 
 // ─── Template data ────────────────────────────────────────────────────────────
@@ -257,16 +257,19 @@ export default function TemplatesPage() {
     ? TEMPLATES
     : TEMPLATES.filter((t) => t.category === activeCategory);
 
+  // Map carousel theme IDs to canvas-editor template IDs
+  const THEME_TO_CANVAS: Record<string, string> = {
+    thread: 'minimal',
+    noir: 'noir',
+    bloom: 'pastel',
+    navy: 'gradient',
+    plasma: 'aurora',
+    clay: 'studio',
+  };
+
   const handleUseTemplate = (tpl: Template) => {
-    const slides: Slide[] = tpl.slides.map((s, i) => ({
-      id: `tpl-${tpl.id}-${i}-${Date.now()}`,
-      type: s.type,
-      numberLabel: s.numberLabel,
-      title: s.title,
-      body: s.body,
-    }));
-    localStorage.setItem('carousel_template', JSON.stringify({ slides, themeId: tpl.themeId }));
-    router.push('/carousel');
+    const canvasTemplate = THEME_TO_CANVAS[tpl.themeId] ?? 'minimal';
+    router.push(`/canvas-editor?template=${canvasTemplate}`);
   };
 
   return (
@@ -359,7 +362,7 @@ export default function TemplatesPage() {
                   onClick={() => handleUseTemplate(tpl)}
                   className="w-full py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:brightness-110 transition-all"
                 >
-                  Use Template
+                  Edit in Canvas
                 </button>
               </div>
             </motion.div>

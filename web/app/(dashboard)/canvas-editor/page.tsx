@@ -74,7 +74,9 @@ const TEMPLATES: TemplateDef[] = [
   { id: "aurora",   name: "Aurora",   description: "Moody purple bokeh with bold type",  bgColor: "#0d0021" },
   { id: "gradient", name: "Gradient", description: "Deep navy-to-violet night sky",      bgColor: "#0a0a1a" },
   { id: "studio",   name: "Studio",   description: "Charcoal magazine editorial style",  bgColor: "#141414" },
-  { id: "pastel",   name: "Pastel",   description: "Warm cream — Instagram-ready soft",  bgColor: "#fff8f5" },
+  { id: "pastel",    name: "Pastel",    description: "Warm cream — Instagram-ready soft",  bgColor: "#fff8f5" },
+  { id: "panoramic", name: "Panoramic", description: "Bleeding orb — swipe to reveal more", bgColor: "#06080f" },
+  { id: "editorial", name: "Editorial", description: "Bold magazine — numbered slide style", bgColor: "#f4f0eb" },
 ];
 
 const COLOR_SWATCHES = [
@@ -275,6 +277,61 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
     if (numLabel) add(T(numLabel, { left: 940, top: y(67), fontFamily: "Arial", fontSize: 18, fill: "#9a3412", opacity: 0.45 }));
   }
 
+  // ── PANORAMIC ─────────────────────────────────────────────────────────────
+  // The orb lives in a virtual 3240px-wide canvas centered at x=1620.
+  // Each slide N shifts the viewport left by (N-1)*1080, revealing a different
+  // portion of the orb — creating the "part of a bigger image" carousel effect.
+  if (id === "panoramic") {
+    bg("#06080f");
+    const slide = Math.max(1, parseInt(numLabel || "1") || 1);
+    const orbX = 1620 - (slide - 1) * 1080; // project virtual center to slide viewport
+
+    add(C({ left: orbX, top: y(290), radius: 1200, fill: "#0c1a4a", opacity: 0.7, selectable: false, evented: false }));
+    add(C({ left: orbX + 100, top: y(244), radius: 900, fill: "#1e40af", opacity: 0.55, selectable: false, evented: false }));
+    add(C({ left: orbX + 200, top: y(196), radius: 620, fill: "#3b82f6", opacity: 0.45, selectable: false, evented: false }));
+    add(C({ left: orbX + 280, top: y(160), radius: 380, fill: "#93c5fd", opacity: 0.35, selectable: false, evented: false }));
+    add(C({ left: orbX + 340, top: y(132), radius: 180, fill: "#dbeafe", opacity: 0.22, selectable: false, evented: false }));
+
+    add(L(lm, y(800), rm, y(800), { stroke: "rgba(255,255,255,0.12)", strokeWidth: 1 }));
+
+    if (isDynamic) {
+      add(TB(titleText, { left: lm, top: y(826), width: 880, fontFamily: "Impact", fontSize: 88, fill: "#ffffff", lineHeight: 0.9 }));
+      if (bodyText) add(TB(bodyText, { left: lm, top: y(962), width: 800, fontFamily: "Georgia", fontSize: 30, fill: "#93c5fd", fontStyle: "italic", lineHeight: 1.4 }));
+    } else {
+      add(T("EXPLORE\nTHE INFINITE.", { left: lm, top: y(826), fontFamily: "Impact", fontSize: 110, fill: "#ffffff", lineHeight: 0.88 }));
+    }
+
+    add(T("@yourbrand", { left: lm, top: bY, fontFamily: "Arial", fontSize: 22, fill: "#60a5fa", charSpacing: 150 }));
+    if (numLabel) add(T(numLabel, { left: 940, top: y(42), fontFamily: "Arial", fontSize: 18, fill: "#60a5fa", opacity: 0.65 }));
+  }
+
+  // ── EDITORIAL ─────────────────────────────────────────────────────────────
+  // Magazine-style with a giant low-opacity slide number as background texture.
+  // The number changes per slide, making each frame feel distinct while the
+  // orange accent stripe maintains visual continuity across the carousel.
+  if (id === "editorial") {
+    bg("#f4f0eb");
+    const slide = Math.max(1, parseInt(numLabel || "1") || 1);
+    const slideStr = String(slide).padStart(2, "0");
+
+    add(T(slideStr, { left: -80, top: y(-200), fontFamily: "Impact", fontSize: 920, fill: "#000000", opacity: 0.055, selectable: false, evented: false }));
+    add(R({ left: 0, top: 0, width: 10, height: h, fill: "#c2410c", selectable: false, evented: false }));
+
+    const em = 36;
+    add(T(slideStr, { left: em, top: y(46), fontFamily: "Impact", fontSize: 72, fill: "#c2410c" }));
+    add(L(em, y(172), 900, y(172), { stroke: "#1a1a1a", strokeWidth: 3 }));
+
+    if (isDynamic) {
+      add(TB(titleText, { left: em, top: y(196), width: 980, fontFamily: "Impact", fontSize: 108, fill: "#1a1a1a", lineHeight: 0.9 }));
+      if (bodyText) add(TB(bodyText, { left: em, top: y(582), width: 900, fontFamily: "Georgia", fontSize: 38, fill: "#333333", lineHeight: 1.55, fontStyle: "italic" }));
+    } else {
+      add(T("MAKE IT\nMATTER.", { left: em, top: y(196), fontFamily: "Impact", fontSize: 150, fill: "#1a1a1a", lineHeight: 0.85 }));
+      add(T("Great design starts with\na great idea.", { left: em, top: y(640), fontFamily: "Georgia", fontSize: 42, fill: "#333333", lineHeight: 1.5, fontStyle: "italic" }));
+    }
+
+    add(T("@yourbrand", { left: em, top: bY, fontFamily: "Arial", fontSize: 22, fill: "#c2410c", charSpacing: 100 }));
+  }
+
   canvas.renderAll();
 }
 
@@ -405,6 +462,18 @@ export default function CanvasEditorPage() {
       fabricMod.current = mod;
       canvas = new mod.Canvas(canvasEl.current!, { width: 1080, height: 1080, backgroundColor: "#ffffff" });
       fc.current = canvas;
+
+      // Auto-apply template from ?template= URL param (set by the Templates page)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTpl = urlParams.get("template");
+      if (urlTpl) {
+        const tplDef = TEMPLATES.find(t => t.id === urlTpl);
+        if (tplDef) {
+          buildTemplate(urlTpl, canvas, mod);
+          setBgColor(tplDef.bgColor);
+        }
+      }
+
       saveHistory();
       canvas.on("selection:created", handleSelect);
       canvas.on("selection:updated", handleSelect);
