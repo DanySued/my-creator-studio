@@ -35,22 +35,9 @@ export default function CarouselPage() {
     }
   }, [slides, themeId, handle, rawText]);
 
-  // Load draft on mount (and check for template from templates page)
+  // Load draft on mount
   useEffect(() => {
     try {
-      // Check for template first
-      const tplRaw = localStorage.getItem('carousel_template');
-      if (tplRaw) {
-        localStorage.removeItem('carousel_template');
-        const tpl = JSON.parse(tplRaw);
-        if (tpl.slides?.length > 0) {
-          toast('Template loaded', { description: 'Customize the slides and download.' });
-          setSlides(tpl.slides);
-          if (tpl.themeId) setThemeId(tpl.themeId);
-          return;
-        }
-      }
-
       const raw = localStorage.getItem('carousel_draft');
       if (!raw) return;
       const draft = JSON.parse(raw);

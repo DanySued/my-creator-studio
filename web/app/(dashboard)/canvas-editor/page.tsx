@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MousePointer2, Type, Square, Circle as CircleIcon, Minus, Pen,
   ImagePlus, Download, Trash2, RotateCcw, RotateCw,
@@ -283,7 +283,7 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
   // portion of the orb — creating the "part of a bigger image" carousel effect.
   if (id === "panoramic") {
     bg("#06080f");
-    const slide = Math.max(1, parseInt(numLabel || "1") || 1);
+    const slide = Math.max(1, parseInt(numLabel || "1"));
     const orbX = 1620 - (slide - 1) * 1080; // project virtual center to slide viewport
 
     add(C({ left: orbX, top: y(290), radius: 1200, fill: "#0c1a4a", opacity: 0.7, selectable: false, evented: false }));
@@ -311,7 +311,7 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
   // orange accent stripe maintains visual continuity across the carousel.
   if (id === "editorial") {
     bg("#f4f0eb");
-    const slide = Math.max(1, parseInt(numLabel || "1") || 1);
+    const slide = Math.max(1, parseInt(numLabel || "1"));
     const slideStr = String(slide).padStart(2, "0");
 
     add(T(slideStr, { left: -80, top: y(-200), fontFamily: "Impact", fontSize: 920, fill: "#000000", opacity: 0.055, selectable: false, evented: false }));
@@ -341,6 +341,7 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
 
 export default function CanvasEditorPage() {
   const router          = useRouter();
+  const searchParams    = useSearchParams();
   const canvasEl        = useRef<HTMLCanvasElement>(null);
   const fc              = useRef<any>(null);
   const fabricMod       = useRef<any>(null);
@@ -463,15 +464,11 @@ export default function CanvasEditorPage() {
       canvas = new mod.Canvas(canvasEl.current!, { width: 1080, height: 1080, backgroundColor: "#ffffff" });
       fc.current = canvas;
 
-      // Auto-apply template from ?template= URL param (set by the Templates page)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlTpl = urlParams.get("template");
-      if (urlTpl) {
-        const tplDef = TEMPLATES.find(t => t.id === urlTpl);
-        if (tplDef) {
-          buildTemplate(urlTpl, canvas, mod);
-          setBgColor(tplDef.bgColor);
-        }
+      const urlTpl = searchParams.get("template");
+      const tplDef = urlTpl ? TEMPLATES.find(t => t.id === urlTpl) : undefined;
+      if (urlTpl && tplDef) {
+        buildTemplate(urlTpl, canvas, mod);
+        setBgColor(tplDef.bgColor);
       }
 
       saveHistory();
@@ -484,7 +481,7 @@ export default function CanvasEditorPage() {
       canvas.on("object:removed",  () => { saveHistory(); setHasUnsaved(true); });
     });
     return () => { canvas?.dispose(); fc.current = null; };
-  }, [saveHistory]);
+  }, [saveHistory, searchParams]);
 
   // ── Slide management ──────────────────────────────────────────────────────
 

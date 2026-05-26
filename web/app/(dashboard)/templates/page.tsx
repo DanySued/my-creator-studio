@@ -247,6 +247,20 @@ const CATEGORY_COLORS: Record<Exclude<Category, 'all'>, string> = {
   tech: 'bg-cyan-500/15 text-cyan-400',
 };
 
+// Map carousel theme IDs to canvas-editor template IDs (module-level — no runtime deps)
+const THEME_TO_CANVAS: Record<string, string> = {
+  thread: 'minimal',
+  noir: 'noir',
+  bloom: 'pastel',
+  navy: 'gradient',
+  plasma: 'aurora',
+  clay: 'studio',
+};
+
+const PREVIEW_SCALE = 0.095;
+const PREVIEW_W = Math.round(1080 * PREVIEW_SCALE);
+const PREVIEW_H = Math.round(1350 * PREVIEW_SCALE);
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TemplatesPage() {
@@ -256,16 +270,6 @@ export default function TemplatesPage() {
   const filtered = activeCategory === 'all'
     ? TEMPLATES
     : TEMPLATES.filter((t) => t.category === activeCategory);
-
-  // Map carousel theme IDs to canvas-editor template IDs
-  const THEME_TO_CANVAS: Record<string, string> = {
-    thread: 'minimal',
-    noir: 'noir',
-    bloom: 'pastel',
-    navy: 'gradient',
-    plasma: 'aurora',
-    clay: 'studio',
-  };
 
   const handleUseTemplate = (tpl: Template) => {
     const canvasTemplate = THEME_TO_CANVAS[tpl.themeId] ?? 'minimal';
@@ -313,9 +317,6 @@ export default function TemplatesPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map((tpl, i) => {
           const theme = getTheme(tpl.themeId);
-          const PREVIEW_SCALE = 0.095;
-          const cardW = Math.round(1080 * PREVIEW_SCALE);
-          const cardH = Math.round(1350 * PREVIEW_SCALE);
 
           return (
             <motion.div
@@ -338,7 +339,7 @@ export default function TemplatesPage() {
                   return (
                     <div
                       key={si}
-                      style={{ width: cardW, height: cardH, flexShrink: 0 }}
+                      style={{ width: PREVIEW_W, height: PREVIEW_H, flexShrink: 0 }}
                       className="rounded overflow-hidden shadow-md"
                     >
                       <SlideCard slide={s} theme={theme} scale={PREVIEW_SCALE} />
