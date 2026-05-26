@@ -48,6 +48,13 @@ async function verifyToken(token: string): Promise<boolean> {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // If AUTH_SECRET is not configured (e.g. local dev without .env), skip all
+  // auth checks so routes are accessible without a password.
+  if (!process.env.AUTH_SECRET) {
+    return NextResponse.next();
+  }
+
   const raw = request.cookies.get('__session')?.value;
   const authenticated = raw ? await verifyToken(raw) : false;
 

@@ -5,10 +5,6 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Canvas Editor", () => {
   test.beforeEach(async ({ page }) => {
-    // Force-set the auth cookie so middleware lets us through
-    await page.context().addCookies([
-      { name: "auth_token", value: "test", domain: "localhost", path: "/" },
-    ]);
     await page.goto("/canvas-editor");
     // Wait for Fabric.js to mount – the canvas element appears after dynamic import
     await page.waitForSelector("canvas", { timeout: 15_000 });
