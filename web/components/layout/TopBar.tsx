@@ -16,8 +16,8 @@ import {
   LogOut,
   Menu,
   X,
-  PenLine,
   Layers2,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { href: "/publish", icon: Send, label: "Publish" },
   { href: "/accounts", icon: Users, label: "Accounts" },
   { href: "/automation", icon: Bot, label: "Automation" },
-  { href: "/svg-editor", icon: PenLine, label: "SVG Editor" },
+  { href: "/templates", icon: LayoutTemplate, label: "Templates" },
   { href: "/canvas-editor", icon: Layers2, label: "Canvas" },
 ];
 

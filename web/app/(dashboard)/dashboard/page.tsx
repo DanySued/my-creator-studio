@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SlideCard, Slide } from "@/components/carousel/SlideCard";
+import { getTheme } from "@/lib/carouselThemes";
 
 const TOOLS = [
   {
@@ -95,6 +97,75 @@ function StatCard({ label, value, loading }: { label: string; value: number | nu
       <p className="text-xs text-muted-foreground mb-2">{label}</p>
       <AnimatedCount value={value} loading={!!loading} />
     </Card>
+  );
+}
+
+interface DraftData {
+  slides: Slide[];
+  themeId: string;
+  savedAt: number;
+}
+
+function RecentDrafts() {
+  const [draft, setDraft] = useState<DraftData | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('carousel_draft');
+      if (raw) {
+        const d = JSON.parse(raw) as DraftData;
+        if (d.slides?.length > 0) setDraft(d);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  if (!draft) return null;
+
+  const timeAgo = (ts: number) => {
+    const mins = Math.round((Date.now() - ts) / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.round(hrs / 24)}d ago`;
+  };
+
+  const theme = getTheme(draft.themeId);
+  const PREVIEW_SCALE = 36 / 1080;
+  const cardW = Math.round(1080 * PREVIEW_SCALE);
+  const cardH = Math.round(1350 * PREVIEW_SCALE);
+
+  return (
+    <div className="mt-10">
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
+        Continue where you left off
+      </h3>
+      <Link href="/carousel">
+        <Card className="p-4 bg-card border-border hover:border-primary/30 ring-1 ring-transparent hover:ring-primary/20 transition-all cursor-pointer group">
+          <div className="flex items-center gap-4">
+            <div className="flex gap-1 shrink-0">
+              {draft.slides.slice(0, 3).map((s: Slide, i: number) => (
+                <div
+                  key={i}
+                  className="rounded-sm overflow-hidden opacity-90"
+                  style={{ width: cardW, height: cardH }}
+                >
+                  <SlideCard slide={s} theme={theme} scale={PREVIEW_SCALE} />
+                </div>
+              ))}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {draft.slides[0]?.title || 'Untitled carousel'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {draft.slides.length} slides · {theme.name} theme · {timeAgo(draft.savedAt)}
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+          </div>
+        </Card>
+      </Link>
+    </div>
   );
 }
 
@@ -234,6 +305,8 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+
+        <RecentDrafts />
       </div>
     </div>
   );
