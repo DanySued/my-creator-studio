@@ -12,7 +12,7 @@ _keys_file = os.path.join(os.getenv("DATA_DIR", "/data"), ".env.keys")
 if os.path.isfile(_keys_file):
     load_dotenv(_keys_file, override=True)
 
-from routers import health, carousel, reels, instagram, automation, svg_templates
+from routers import health, carousel, reels, instagram, automation
 from models.database import init_db, db
 from services.job_queue import init_scheduler
 
@@ -63,7 +63,6 @@ app.include_router(carousel.router, prefix="/carousel", tags=["carousel"])
 app.include_router(reels.router, prefix="/reels", tags=["reels"])
 app.include_router(instagram.router, prefix="/instagram", tags=["instagram"])
 app.include_router(automation.router, prefix="/automation", tags=["automation"])
-app.include_router(svg_templates.router, prefix="/svg-templates", tags=["svg-templates"])
 
 MEDIA_DIR = os.getenv("MEDIA_DIR", "/media")
 if os.path.isdir(MEDIA_DIR):
