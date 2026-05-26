@@ -2,6 +2,7 @@ import TopBar from "@/components/layout/TopBar";
 import { GlobalReelStatus } from "@/components/layout/GlobalReelStatus";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { ReelGenerationProvider } from "@/lib/ReelGenerationContext";
+import { Toaster } from "sonner";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
       <GlobalReelStatus />
+      <Toaster richColors position="bottom-right" />
     </ReelGenerationProvider>
   );
 }
