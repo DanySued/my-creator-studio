@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   MousePointer2, Type, Square, Circle as CircleIcon, Minus, Pen,
@@ -339,7 +339,7 @@ function buildTemplate(id: string, canvas: any, mod: any, slideData?: SlideData)
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function CanvasEditorPage() {
+function CanvasEditorPage() {
   const router          = useRouter();
   const searchParams    = useSearchParams();
   const canvasEl        = useRef<HTMLCanvasElement>(null);
@@ -1553,5 +1553,13 @@ export default function CanvasEditorPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function CanvasEditorPageWrapper() {
+  return (
+    <Suspense>
+      <CanvasEditorPage />
+    </Suspense>
   );
 }
